@@ -87,9 +87,14 @@ Examples:
     )
     parser.add_argument(
         "--output",
-        choices=["text", "html"],
+        choices=["text", "html", "pdf"],
         default="text",
         help="Report format (default: text)"
+    )
+    parser.add_argument(
+        "--email",
+        default=None,
+        help="Email address to send the report to after generation (PDF only)"
     )
     parser.add_argument(
         "--out-dir",
@@ -249,11 +254,23 @@ def main():
     out_dir = Path(args.out_dir)
     out_dir.mkdir(exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    ext = "html" if args.output == "html" else "txt"
+    ext = {"html": "html", "pdf": "pdf"}.get(args.output, "txt")
     out_file = out_dir / f"audit_{timestamp}.{ext}"
 
     generate_report(results, output_path=str(out_file), fmt=args.output)
     print(f"\n[✓] Report saved to: {out_file}")
+
+    # Send email if requested
+    if args.email:
+        if args.output != "pdf":
+            print("[WARNING] Email delivery works best with --output pdf. Re-run with --output pdf to attach the report.")
+        else:
+            from emailer import send_report
+            send_report(
+                to=args.email,
+                report_path=str(out_file),
+                results=results
+            )
 
 
 if __name__ == "__main__":

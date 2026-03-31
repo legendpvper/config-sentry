@@ -81,7 +81,30 @@ A Python CLI tool that SSHs into network devices, pulls their running configurat
 |---|---|---|
 | CHK-024 | Default admin with no password | FAIL |
 
-## Risk Scoring
+## Email Delivery
+
+ConfigSentry can automatically email the PDF report to any recipient after an audit.
+
+**Setup:**
+
+1. Create a `.env` file in the project root:
+```
+CONFIGSENTRY_EMAIL=configsentry@gmail.com
+CONFIGSENTRY_APP_PASSWORD=your_16_char_app_password
+```
+
+2. Generate a Gmail App Password at [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
+
+**Usage:**
+```bash
+python auditor.py --devices devices/inventory.yaml --output pdf --email client@company.com
+```
+
+The recipient receives a formatted HTML email with a summary table and the full PDF attached.
+
+> The `.env` file is gitignored and never committed.
+
+
 
 Every audited device receives a **0–100 risk score** based on weighted findings:
 
@@ -113,12 +136,13 @@ python auditor.py --host 192.168.1.1 --username admin --device-type cisco_ios
 **Multiple devices from inventory file (live SSH):**
 ```bash
 python auditor.py --devices devices/inventory.yaml --output html
+python auditor.py --devices devices/inventory.yaml --output pdf
 ```
 
 **Offline mode — audit a saved config file (no SSH needed):**
 ```bash
 python auditor.py --config-file running-config.txt --device-type cisco_ios
-python auditor.py --config-file fortigate.conf --device-type fortinet --device-name Firewall-01 --output html
+python auditor.py --config-file fortigate.conf --device-type fortinet --device-name Firewall-01 --output pdf
 ```
 
 Reports are saved to the `reports/` directory.
