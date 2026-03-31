@@ -35,6 +35,7 @@ def _build_text(results: list[dict]) -> str:
 
     for r in results:
         lines.append(f"\nDevice : {r['hostname']} ({r['host']})")
+        lines.append(f"Mode   : {'OFFLINE (config file)' if r.get('mode') == 'offline' else 'LIVE (SSH)'}")
         lines.append(f"Status : {r['status']}")
         lines.append(f"Time   : {r['timestamp']}")
         lines.append("-" * 65)
@@ -102,7 +103,7 @@ def _build_html(results: list[dict]) -> str:
         device_blocks += f"""
         <div class="device">
             <h2>{r['hostname']} <span class="ip">({r['host']})</span></h2>
-            <p class="timestamp">Audited: {r['timestamp']}</p>
+            <p class="timestamp">Audited: {r['timestamp']} &nbsp;·&nbsp; <span class="mode-badge {'offline' if r.get('mode') == 'offline' else 'live'}">{'OFFLINE' if r.get('mode') == 'offline' else 'LIVE SSH'}</span></p>
             <div class="summary-bar">
                 <span class="pill fail">{fails} FAIL</span>
                 <span class="pill warning">{warnings} WARNING</span>
@@ -150,7 +151,9 @@ def _build_html(results: list[dict]) -> str:
   .badge.pass {{ background: #1c4532; color: #68d391; }}
   .badge.unreachable {{ background: #4a1d96; color: #d6bcfa; margin-left: 0.5rem; }}
   .remediation {{ margin-top: 0.4rem; color: #63b3ed; font-size: 0.82rem; }}
-  .error-msg {{ color: #fc8181; margin-top: 0.5rem; }}
+  .mode-badge {{ display: inline-block; padding: 0.1rem 0.5rem; border-radius: 4px; font-size: 0.72rem; font-weight: 700; }}
+  .mode-badge.offline {{ background: #2d3748; color: #a0aec0; }}
+  .mode-badge.live {{ background: #1c4532; color: #68d391; }}
 </style>
 </head>
 <body>

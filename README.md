@@ -91,19 +91,20 @@ pip install -r requirements.txt
 
 ## Usage
 
-**Single device:**
+**Single device (live SSH):**
 ```bash
 python auditor.py --host 192.168.1.1 --username admin --device-type cisco_ios
 ```
 
-**Multiple devices from inventory file:**
-```bash
-python auditor.py --devices devices/inventory.yaml
-```
-
-**HTML report output:**
+**Multiple devices from inventory file (live SSH):**
 ```bash
 python auditor.py --devices devices/inventory.yaml --output html
+```
+
+**Offline mode — audit a saved config file (no SSH needed):**
+```bash
+python auditor.py --config-file running-config.txt --device-type cisco_ios
+python auditor.py --config-file fortigate.conf --device-type fortinet --device-name Firewall-01 --output html
 ```
 
 Reports are saved to the `reports/` directory.
