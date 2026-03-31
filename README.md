@@ -81,7 +81,21 @@ A Python CLI tool that SSHs into network devices, pulls their running configurat
 |---|---|---|
 | CHK-024 | Default admin with no password | FAIL |
 
-## Installation
+## Risk Scoring
+
+Every audited device receives a **0–100 risk score** based on weighted findings:
+
+| Score | Risk Level | Meaning |
+|---|---|---|
+| 90–100 | LOW | Well-hardened, minor improvements possible |
+| 70–89 | GUARDED | Generally secure, some areas need attention |
+| 50–69 | ELEVATED | Notable gaps present, remediation recommended |
+| 30–49 | HIGH | Significant misconfigurations, prompt action required |
+| 0–29 | CRITICAL | Severe gaps, immediate remediation required |
+
+Each check carries a weight reflecting its real-world impact. A Telnet-enabled device loses more points than a missing NTP server. FAIL deducts full weight, WARNING deducts half.
+
+
 
 ```bash
 git clone https://github.com/yourusername/net-auditor.git

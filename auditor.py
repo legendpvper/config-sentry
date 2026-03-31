@@ -23,6 +23,7 @@ from pathlib import Path
 from connector import connect_to_device
 from checks import run_all_checks
 from reporter import generate_report
+from scorer import calculate_score
 
 
 SUPPORTED_DEVICE_TYPES = [
@@ -144,12 +145,16 @@ def audit_device_live(device: dict) -> dict:
     failures = sum(1 for f in findings if f["severity"] == "FAIL")
     print(f"    PASS: {passed}  WARNING: {warnings}  FAIL: {failures}")
 
+    score_data = calculate_score(findings)
+    print(f"    Risk Score: {score_data['score']}/100 — {score_data['risk_level']}")
+
     return {
         "host": host,
         "hostname": device.get("name", host),
         "mode": "live",
         "status": "OK",
         "findings": findings,
+        "score": score_data,
         "raw_config": raw_config,
         "timestamp": datetime.now().isoformat()
     }
@@ -194,12 +199,16 @@ def audit_device_offline(config_path: str, device_type: str, device_name: str = 
     failures = sum(1 for f in findings if f["severity"] == "FAIL")
     print(f"    PASS: {passed}  WARNING: {warnings}  FAIL: {failures}")
 
+    score_data = calculate_score(findings)
+    print(f"    Risk Score: {score_data['score']}/100 — {score_data['risk_level']}")
+
     return {
         "host": str(path),
         "hostname": display_name,
         "mode": "offline",
         "status": "OK",
         "findings": findings,
+        "score": score_data,
         "raw_config": raw_config,
         "timestamp": datetime.now().isoformat()
     }

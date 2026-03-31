@@ -44,6 +44,12 @@ def _build_text(results: list[dict]) -> str:
             lines.append("  [!] Device was unreachable. No checks performed.")
             continue
 
+        score = r.get("score", {})
+        if score:
+            lines.append(f"  Risk Score : {score['score']}/100 — {score['risk_level']}")
+            lines.append(f"  {score['summary']}")
+            lines.append("")
+
         findings = sorted(r["findings"], key=lambda f: SEVERITY_ORDER.get(f["severity"], 9))
 
         fails    = [f for f in findings if f["severity"] == "FAIL"]
@@ -100,10 +106,28 @@ def _build_html(results: list[dict]) -> str:
                     <td>{f['detail']}{fix}</td>
                 </tr>"""
 
+        score = r.get("score", {})
+        score_html = ""
+        if score:
+            from scorer import score_colour
+            css = score_colour(score["risk_level"])
+            score_html = f"""
+            <div class="score-card">
+                <div class="score-circle {css}">
+                    <span class="score-num">{score['score']}</span>
+                    <span class="score-denom">/100</span>
+                </div>
+                <div class="score-info">
+                    <div class="risk-level" style="color: inherit">{score['risk_level']} RISK</div>
+                    <div class="risk-summary">{score['summary']}</div>
+                </div>
+            </div>"""
+
         device_blocks += f"""
         <div class="device">
             <h2>{r['hostname']} <span class="ip">({r['host']})</span></h2>
             <p class="timestamp">Audited: {r['timestamp']} &nbsp;·&nbsp; <span class="mode-badge {'offline' if r.get('mode') == 'offline' else 'live'}">{'OFFLINE' if r.get('mode') == 'offline' else 'LIVE SSH'}</span></p>
+            {score_html}
             <div class="summary-bar">
                 <span class="pill fail">{fails} FAIL</span>
                 <span class="pill warning">{warnings} WARNING</span>
@@ -154,6 +178,17 @@ def _build_html(results: list[dict]) -> str:
   .mode-badge {{ display: inline-block; padding: 0.1rem 0.5rem; border-radius: 4px; font-size: 0.72rem; font-weight: 700; }}
   .mode-badge.offline {{ background: #2d3748; color: #a0aec0; }}
   .mode-badge.live {{ background: #1c4532; color: #68d391; }}
+  .score-card {{ display: flex; align-items: center; gap: 1.5rem; background: #141720; border: 1px solid #2d3748; border-radius: 8px; padding: 1rem 1.5rem; margin-bottom: 1rem; }}
+  .score-circle {{ width: 72px; height: 72px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0; }}
+  .score-circle .score-num {{ font-size: 1.4rem; font-weight: 700; line-height: 1; }}
+  .score-circle .score-denom {{ font-size: 0.7rem; opacity: 0.8; }}
+  .score-info .risk-level {{ font-size: 1rem; font-weight: 700; margin-bottom: 0.2rem; }}
+  .score-info .risk-summary {{ font-size: 0.82rem; color: #718096; }}
+  .score-low {{ background: #1c4532; color: #68d391; }}
+  .score-guarded {{ background: #1a3a5c; color: #63b3ed; }}
+  .score-elevated {{ background: #744210; color: #f6ad55; }}
+  .score-high {{ background: #742a2a; color: #fc8181; }}
+  .score-critical {{ background: #4a0000; color: #ff6b6b; }}
 </style>
 </head>
 <body>
