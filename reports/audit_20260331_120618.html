@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Network Audit Report</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #0f1117; color: #e2e8f0; padding: 2rem; }
+  h1 { font-size: 1.6rem; color: #63b3ed; margin-bottom: 0.25rem; }
+  .meta { color: #718096; font-size: 0.85rem; margin-bottom: 2rem; }
+  .device { background: #1a1d27; border: 1px solid #2d3748; border-radius: 10px; padding: 1.5rem; margin-bottom: 2rem; }
+  .device h2 { font-size: 1.15rem; color: #e2e8f0; margin-bottom: 0.25rem; }
+  .ip { color: #718096; font-weight: normal; font-size: 0.9rem; }
+  .timestamp { color: #718096; font-size: 0.8rem; margin-bottom: 1rem; }
+  .summary-bar { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+  .pill { padding: 0.2rem 0.75rem; border-radius: 999px; font-size: 0.78rem; font-weight: 600; }
+  .pill.fail { background: #742a2a; color: #fc8181; }
+  .pill.warning { background: #744210; color: #f6ad55; }
+  .pill.pass { background: #1c4532; color: #68d391; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+  th { background: #2d3748; color: #a0aec0; text-align: left; padding: 0.6rem 1rem; font-weight: 600; }
+  td { padding: 0.65rem 1rem; border-bottom: 1px solid #2d3748; vertical-align: top; }
+  tr.fail td { background: #1a0a0a; }
+  tr.warning td { background: #1a120a; }
+  tr.pass td { background: #0a1a0f; }
+  .check-id { font-family: monospace; color: #a0aec0; white-space: nowrap; }
+  .badge { padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; }
+  .badge.fail { background: #742a2a; color: #fc8181; }
+  .badge.warning { background: #744210; color: #f6ad55; }
+  .badge.pass { background: #1c4532; color: #68d391; }
+  .badge.unreachable { background: #4a1d96; color: #d6bcfa; margin-left: 0.5rem; }
+  .remediation { margin-top: 0.4rem; color: #63b3ed; font-size: 0.82rem; }
+  .error-msg { color: #fc8181; margin-top: 0.5rem; }
+</style>
+</head>
+<body>
+<h1>🔒 Network Configuration Audit Report</h1>
+<p class="meta">Generated: 2026-03-31 12:06:18</p>
+
+            <div class="device unreachable">
+                <h2>Core-Router-01 <span class="ip">(sandbox-iosxe-latest-1.cisco.com)</span>
+                    <span class="badge unreachable">UNREACHABLE</span>
+                </h2>
+                <p class="error-msg">Device was unreachable. No checks performed.</p>
+            </div>
+</body>
+</html>

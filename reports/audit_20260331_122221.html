@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Network Audit Report</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #0f1117; color: #e2e8f0; padding: 2rem; }
+  h1 { font-size: 1.6rem; color: #63b3ed; margin-bottom: 0.25rem; }
+  .meta { color: #718096; font-size: 0.85rem; margin-bottom: 2rem; }
+  .device { background: #1a1d27; border: 1px solid #2d3748; border-radius: 10px; padding: 1.5rem; margin-bottom: 2rem; }
+  .device h2 { font-size: 1.15rem; color: #e2e8f0; margin-bottom: 0.25rem; }
+  .ip { color: #718096; font-weight: normal; font-size: 0.9rem; }
+  .timestamp { color: #718096; font-size: 0.8rem; margin-bottom: 1rem; }
+  .summary-bar { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+  .pill { padding: 0.2rem 0.75rem; border-radius: 999px; font-size: 0.78rem; font-weight: 600; }
+  .pill.fail { background: #742a2a; color: #fc8181; }
+  .pill.warning { background: #744210; color: #f6ad55; }
+  .pill.pass { background: #1c4532; color: #68d391; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+  th { background: #2d3748; color: #a0aec0; text-align: left; padding: 0.6rem 1rem; font-weight: 600; }
+  td { padding: 0.65rem 1rem; border-bottom: 1px solid #2d3748; vertical-align: top; }
+  tr.fail td { background: #1a0a0a; }
+  tr.warning td { background: #1a120a; }
+  tr.pass td { background: #0a1a0f; }
+  .check-id { font-family: monospace; color: #a0aec0; white-space: nowrap; }
+  .badge { padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; }
+  .badge.fail { background: #742a2a; color: #fc8181; }
+  .badge.warning { background: #744210; color: #f6ad55; }
+  .badge.pass { background: #1c4532; color: #68d391; }
+  .badge.unreachable { background: #4a1d96; color: #d6bcfa; margin-left: 0.5rem; }
+  .remediation { margin-top: 0.4rem; color: #63b3ed; font-size: 0.82rem; }
+  .error-msg { color: #fc8181; margin-top: 0.5rem; }
+</style>
+</head>
+<body>
+<h1>🔒 Network Configuration Audit Report</h1>
+<p class="meta">Generated: 2026-03-31 12:22:21</p>
+
+        <div class="device">
+            <h2>Core-Router-01 <span class="ip">(sandbox-iosxr-1.cisco.com)</span></h2>
+            <p class="timestamp">Audited: 2026-03-31T12:22:21.202154</p>
+            <div class="summary-bar">
+                <span class="pill fail">1 FAIL</span>
+                <span class="pill warning">2 WARNING</span>
+                <span class="pill pass">8 PASS</span>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th><th>Severity</th><th>Check</th><th>Detail</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <tr class="fail">
+                    <td class="check-id">CHK-010</td>
+                    <td><span class="badge fail">FAIL</span></td>
+                    <td>Password Encryption Disabled</td>
+                    <td>service password-encryption is not enabled. Passwords in config may be stored in plaintext.<div class='remediation'>→ Run: service password-encryption</div></td>
+                </tr>
+                <tr class="warning">
+                    <td class="check-id">CHK-002</td>
+                    <td><span class="badge warning">WARNING</span></td>
+                    <td>SSH Version Not Explicitly Set</td>
+                    <td>SSH version 2 is not explicitly configured. Device may fall back to SSHv1.<div class='remediation'>→ Run: ip ssh version 2</div></td>
+                </tr>
+                <tr class="warning">
+                    <td class="check-id">CHK-005</td>
+                    <td><span class="badge warning">WARNING</span></td>
+                    <td>NTP Not Configured</td>
+                    <td>No NTP server configured. Accurate timestamps are critical for log correlation and incident response.<div class='remediation'>→ Configure at least one NTP server: ntp server <ip></div></td>
+                </tr>
+                <tr class="pass">
+                    <td class="check-id">CHK-001</td>
+                    <td><span class="badge pass">PASS</span></td>
+                    <td>Telnet Enabled on VTY Lines</td>
+                    <td>No Telnet transport found on VTY lines.</td>
+                </tr>
+                <tr class="pass">
+                    <td class="check-id">CHK-003</td>
+                    <td><span class="badge pass">PASS</span></td>
+                    <td>Default SNMP Community String</td>
+                    <td>No default SNMP community strings found.</td>
+                </tr>
+                <tr class="pass">
+                    <td class="check-id">CHK-004</td>
+                    <td><span class="badge pass">PASS</span></td>
+                    <td>SNMP ACL Restriction</td>
+                    <td>SNMP does not appear to be configured.</td>
+                </tr>
+                <tr class="pass">
+                    <td class="check-id">CHK-006</td>
+                    <td><span class="badge pass">PASS</span></td>
+                    <td>Login Banner</td>
+                    <td>Login or MOTD banner is configured.</td>
+                </tr>
+                <tr class="pass">
+                    <td class="check-id">CHK-007</td>
+                    <td><span class="badge pass">PASS</span></td>
+                    <td>Privilege 15 Users</td>
+                    <td>Privilege 15 user count is acceptable: none found.</td>
+                </tr>
+                <tr class="pass">
+                    <td class="check-id">CHK-008</td>
+                    <td><span class="badge pass">PASS</span></td>
+                    <td>Console Line Password</td>
+                    <td>Console line appears to require authentication.</td>
+                </tr>
+                <tr class="pass">
+                    <td class="check-id">CHK-009</td>
+                    <td><span class="badge pass">PASS</span></td>
+                    <td>VTY Access-Class</td>
+                    <td>VTY lines are protected by access-class ACLs.</td>
+                </tr>
+                <tr class="pass">
+                    <td class="check-id">CHK-011</td>
+                    <td><span class="badge pass">PASS</span></td>
+                    <td>HTTP Server</td>
+                    <td>Unencrypted HTTP server is not enabled.</td>
+                </tr></tbody>
+            </table>
+        </div>
+</body>
+</html>
