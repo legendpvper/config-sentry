@@ -81,7 +81,24 @@ A Python CLI tool that SSHs into network devices, pulls their running configurat
 |---|---|---|
 | CHK-024 | Default admin with no password | FAIL |
 
-## Scheduled Runs (Windows Task Scheduler)
+## Remediation Scripts
+
+Add `--remediation` to any audit command and ConfigSentry will generate a ready-to-paste CLI fix script for every FAIL and WARNING finding:
+
+```bash
+python auditor.py --devices devices/inventory.yaml --output pdf --remediation
+```
+
+The script is saved to the `reports/` directory alongside the report:
+```
+reports/
+├── audit_20260331_120000.pdf
+└── remediation_Core-Router-01_20260331_120000.txt
+```
+
+Each finding includes the exact vendor-specific commands needed to fix it, with placeholders clearly marked in `<ANGLE-BRACKETS>`. Critical fixes are listed first, followed by recommended improvements.
+
+
 
 ConfigSentry can register itself as a Windows scheduled task so audits run automatically — no manual trigger needed.
 

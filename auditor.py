@@ -124,6 +124,11 @@ Examples:
         help="List all active ConfigSentry scheduled tasks"
     )
     parser.add_argument(
+        "--remediation",
+        action="store_true",
+        help="Generate a CLI remediation script alongside the report"
+    )
+    parser.add_argument(
         "--out-dir",
         default="reports",
         help="Directory to save reports (default: ./reports)"
@@ -289,11 +294,13 @@ def main():
             device_type=args.device_type,
             device_name=args.device_name
         )]
+        device_types = [args.device_type]
 
     # ── Live SSH mode (inventory file) ────────────────────────────
     elif args.devices:
         devices = load_inventory(args.devices)
         results = [audit_device_live(d) for d in devices]
+        device_types = [d.get("device_type", "cisco_ios") for d in devices]
 
     # ── Live SSH mode (single host) ───────────────────────────────
     else:
@@ -309,6 +316,7 @@ def main():
             "password": password,
             "device_type": args.device_type
         })]
+        device_types = [args.device_type]
 
     # ── Generate report ───────────────────────────────────────────
     out_dir = Path(args.out_dir)
@@ -320,7 +328,19 @@ def main():
     generate_report(results, output_path=str(out_file), fmt=args.output)
     print(f"\n[✓] Report saved to: {out_file}")
 
-    # Send email if requested
+    # ── Generate remediation scripts if requested ─────────────────
+    if args.remediation:
+        from remediator import generate_all_remediation_scripts
+        scripts = generate_all_remediation_scripts(
+            results=results,
+            device_types=device_types,
+            out_dir=str(out_dir),
+            timestamp=timestamp
+        )
+        if not scripts:
+            print("[✓] No remediation needed — all checks passed.")
+
+    # ── Send email if requested ───────────────────────────────────
     if args.email:
         if args.output != "pdf":
             print("[WARNING] Email delivery works best with --output pdf. Re-run with --output pdf to attach the report.")
