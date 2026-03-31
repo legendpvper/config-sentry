@@ -19,7 +19,11 @@ import re
 
 def run_all_checks(config: str, device_type: str) -> list[dict]:
     """Run all applicable checks for the given device type."""
-    checks = [
+    from connector import VENDOR_FAMILY
+    family = VENDOR_FAMILY.get(device_type, "cisco")
+
+    # Universal checks that apply to all vendors
+    universal_checks = [
         check_telnet_enabled,
         check_ssh_version,
         check_default_snmp_community,
@@ -33,6 +37,22 @@ def run_all_checks(config: str, device_type: str) -> list[dict]:
         check_http_server_enabled,
     ]
 
+    # Vendor-specific additional checks
+    vendor_checks = {
+        "cisco":      [check_cdp_enabled, check_ip_source_route],
+        "cisco_xr":   [check_ip_source_route],
+        "cisco_nxos": [check_cdp_enabled],
+        "cisco_asa":  [check_asa_asdm_enabled, check_asa_icmp_unreachable],
+        "fortinet":   [check_fortinet_admin_https, check_fortinet_trusted_hosts],
+        "paloalto":   [check_paloalto_panorama, check_paloalto_syslog],
+        "juniper":    [check_juniper_root_login, check_juniper_ntp],
+        "arista":     [check_cdp_enabled],
+        "huawei":     [check_huawei_telnet, check_huawei_snmp],
+        "hp_comware": [],
+        "mikrotik":   [check_mikrotik_default_admin],
+    }
+
+    checks = universal_checks + vendor_checks.get(family, [])
     findings = []
     for check_fn in checks:
         try:
@@ -286,5 +306,293 @@ def check_http_server_enabled(config: str, device_type: str) -> dict:
         "title": "HTTP Server",
         "severity": "PASS",
         "detail": "Unencrypted HTTP server is not enabled.",
+        "remediation": ""
+    }
+
+
+# ─────────────────────────────────────────────
+# Cisco-Specific Checks
+# ─────────────────────────────────────────────
+
+def check_cdp_enabled(config: str, device_type: str) -> dict:
+    """Warn if CDP is enabled globally — leaks device info to neighbours."""
+    if re.search(r"^cdp run", config, re.IGNORECASE | re.MULTILINE):
+        return {
+            "check_id": "CHK-012",
+            "title": "CDP Enabled Globally",
+            "severity": "WARNING",
+            "detail": "Cisco Discovery Protocol (CDP) is enabled and broadcasts device model, IOS version, and IP addresses to neighbours.",
+            "remediation": "Disable globally with: no cdp run. Re-enable per interface only where needed."
+        }
+    return {
+        "check_id": "CHK-012",
+        "title": "CDP Global Status",
+        "severity": "PASS",
+        "detail": "CDP is not enabled globally.",
+        "remediation": ""
+    }
+
+
+def check_ip_source_route(config: str, device_type: str) -> dict:
+    """Fail if IP source routing is enabled."""
+    if re.search(r"ip source-route", config, re.IGNORECASE):
+        return {
+            "check_id": "CHK-013",
+            "title": "IP Source Routing Enabled",
+            "severity": "FAIL",
+            "detail": "IP source routing allows packets to specify their own route, which can be exploited to bypass access controls.",
+            "remediation": "Disable with: no ip source-route"
+        }
+    return {
+        "check_id": "CHK-013",
+        "title": "IP Source Routing",
+        "severity": "PASS",
+        "detail": "IP source routing is disabled.",
+        "remediation": ""
+    }
+
+
+# ─────────────────────────────────────────────
+# Cisco ASA-Specific Checks
+# ─────────────────────────────────────────────
+
+def check_asa_asdm_enabled(config: str, device_type: str) -> dict:
+    """Warn if ASDM (web GUI) is accessible from any host."""
+    if re.search(r"http 0\.0\.0\.0 0\.0\.0\.0", config, re.IGNORECASE):
+        return {
+            "check_id": "CHK-014",
+            "title": "ASDM Access Not Restricted",
+            "severity": "FAIL",
+            "detail": "ASDM (web management) is accessible from any IP address.",
+            "remediation": "Restrict ASDM access to specific management hosts: http <ip> <mask> <interface>"
+        }
+    return {
+        "check_id": "CHK-014",
+        "title": "ASDM Access Restriction",
+        "severity": "PASS",
+        "detail": "ASDM access appears to be restricted.",
+        "remediation": ""
+    }
+
+
+def check_asa_icmp_unreachable(config: str, device_type: str) -> dict:
+    """Warn if ICMP unreachable messages are enabled on outside interface."""
+    if re.search(r"icmp unreachable rate-limit", config, re.IGNORECASE):
+        return {
+            "check_id": "CHK-015",
+            "title": "ICMP Unreachable Rate Limit",
+            "severity": "PASS",
+            "detail": "ICMP unreachable rate limiting is configured.",
+            "remediation": ""
+        }
+    return {
+        "check_id": "CHK-015",
+        "title": "ICMP Unreachable Rate Limit Missing",
+        "severity": "WARNING",
+        "detail": "No ICMP unreachable rate limit configured. Can be used for network reconnaissance.",
+        "remediation": "Add: icmp unreachable rate-limit 1 burst-size 1"
+    }
+
+
+# ─────────────────────────────────────────────
+# Fortinet-Specific Checks
+# ─────────────────────────────────────────────
+
+def check_fortinet_admin_https(config: str, device_type: str) -> dict:
+    """Fail if HTTP (not HTTPS) admin access is enabled on FortiGate."""
+    if re.search(r"set admintimeout", config, re.IGNORECASE):
+        if re.search(r"set admin-sport 443", config, re.IGNORECASE) or \
+           re.search(r"set admin-https enable", config, re.IGNORECASE):
+            return {
+                "check_id": "CHK-016",
+                "title": "FortiGate HTTPS Admin Access",
+                "severity": "PASS",
+                "detail": "HTTPS admin access is enabled.",
+                "remediation": ""
+            }
+    if re.search(r"set admin-http enable", config, re.IGNORECASE):
+        return {
+            "check_id": "CHK-016",
+            "title": "FortiGate HTTP Admin Access Enabled",
+            "severity": "FAIL",
+            "detail": "Unencrypted HTTP admin access is enabled on FortiGate.",
+            "remediation": "Disable with: set admin-http disable under config system global"
+        }
+    return {
+        "check_id": "CHK-016",
+        "title": "FortiGate Admin Access",
+        "severity": "PASS",
+        "detail": "HTTP admin access does not appear to be enabled.",
+        "remediation": ""
+    }
+
+
+def check_fortinet_trusted_hosts(config: str, device_type: str) -> dict:
+    """Warn if admin accounts have no trusted host restriction."""
+    admin_blocks = re.findall(r"edit \S+.*?next", config, re.DOTALL)
+    untrusted = [b for b in admin_blocks if "trusthost" not in b.lower() and "set name" in b.lower()]
+    if untrusted:
+        return {
+            "check_id": "CHK-017",
+            "title": "FortiGate Admin Without Trusted Hosts",
+            "severity": "WARNING",
+            "detail": "One or more admin accounts have no trusted host restriction. Admin GUI accessible from any IP.",
+            "remediation": "Set trusted hosts per admin: set trusthost1 <ip/mask> under config system admin"
+        }
+    return {
+        "check_id": "CHK-017",
+        "title": "FortiGate Admin Trusted Hosts",
+        "severity": "PASS",
+        "detail": "Admin accounts appear to have trusted host restrictions.",
+        "remediation": ""
+    }
+
+
+# ─────────────────────────────────────────────
+# Palo Alto-Specific Checks
+# ─────────────────────────────────────────────
+
+def check_paloalto_panorama(config: str, device_type: str) -> dict:
+    """Warn if device is not managed by Panorama."""
+    if not re.search(r"panorama-server", config, re.IGNORECASE):
+        return {
+            "check_id": "CHK-018",
+            "title": "Panorama Not Configured",
+            "severity": "WARNING",
+            "detail": "Device does not appear to be connected to Panorama centralised management.",
+            "remediation": "Configure Panorama for centralised policy and log management."
+        }
+    return {
+        "check_id": "CHK-018",
+        "title": "Panorama Management",
+        "severity": "PASS",
+        "detail": "Panorama server is configured.",
+        "remediation": ""
+    }
+
+
+def check_paloalto_syslog(config: str, device_type: str) -> dict:
+    """Warn if no syslog server is configured."""
+    if not re.search(r"syslog", config, re.IGNORECASE):
+        return {
+            "check_id": "CHK-019",
+            "title": "Syslog Not Configured",
+            "severity": "WARNING",
+            "detail": "No syslog server configured. Logs may not be forwarded to a central SIEM.",
+            "remediation": "Configure a syslog profile under Device > Server Profiles > Syslog"
+        }
+    return {
+        "check_id": "CHK-019",
+        "title": "Syslog Configuration",
+        "severity": "PASS",
+        "detail": "Syslog server is configured.",
+        "remediation": ""
+    }
+
+
+# ─────────────────────────────────────────────
+# Juniper-Specific Checks
+# ─────────────────────────────────────────────
+
+def check_juniper_root_login(config: str, device_type: str) -> dict:
+    """Fail if root login is permitted via SSH on Juniper."""
+    if re.search(r"root-login allow", config, re.IGNORECASE):
+        return {
+            "check_id": "CHK-020",
+            "title": "Juniper Root SSH Login Allowed",
+            "severity": "FAIL",
+            "detail": "Direct root login via SSH is permitted. Root account is a high-value target.",
+            "remediation": "Set: set system services ssh root-login deny"
+        }
+    return {
+        "check_id": "CHK-020",
+        "title": "Juniper Root SSH Login",
+        "severity": "PASS",
+        "detail": "Root SSH login does not appear to be explicitly allowed.",
+        "remediation": ""
+    }
+
+
+def check_juniper_ntp(config: str, device_type: str) -> dict:
+    """Warn if NTP is not configured on Juniper device."""
+    if not re.search(r"ntp {", config, re.IGNORECASE):
+        return {
+            "check_id": "CHK-021",
+            "title": "Juniper NTP Not Configured",
+            "severity": "WARNING",
+            "detail": "No NTP configuration found. Accurate time is critical for log correlation.",
+            "remediation": "Configure NTP: set system ntp server <ip>"
+        }
+    return {
+        "check_id": "CHK-021",
+        "title": "Juniper NTP",
+        "severity": "PASS",
+        "detail": "NTP appears to be configured.",
+        "remediation": ""
+    }
+
+
+# ─────────────────────────────────────────────
+# Huawei-Specific Checks
+# ─────────────────────────────────────────────
+
+def check_huawei_telnet(config: str, device_type: str) -> dict:
+    """Fail if Telnet service is enabled on Huawei device."""
+    if re.search(r"telnet server enable", config, re.IGNORECASE):
+        return {
+            "check_id": "CHK-022",
+            "title": "Huawei Telnet Server Enabled",
+            "severity": "FAIL",
+            "detail": "Telnet server is enabled. Credentials transmitted in plaintext.",
+            "remediation": "Disable with: undo telnet server enable. Use STelnet (SSH) instead."
+        }
+    return {
+        "check_id": "CHK-022",
+        "title": "Huawei Telnet Server",
+        "severity": "PASS",
+        "detail": "Telnet server does not appear to be enabled.",
+        "remediation": ""
+    }
+
+
+def check_huawei_snmp(config: str, device_type: str) -> dict:
+    """Fail if Huawei device uses SNMPv1 or v2c with default community."""
+    if re.search(r"snmp-agent community (read|write) (public|private)", config, re.IGNORECASE):
+        return {
+            "check_id": "CHK-023",
+            "title": "Huawei Default SNMP Community",
+            "severity": "FAIL",
+            "detail": "Default SNMP community string detected on Huawei device.",
+            "remediation": "Change community strings and consider upgrading to SNMPv3."
+        }
+    return {
+        "check_id": "CHK-023",
+        "title": "Huawei SNMP Community",
+        "severity": "PASS",
+        "detail": "No default SNMP community strings found.",
+        "remediation": ""
+    }
+
+
+# ─────────────────────────────────────────────
+# MikroTik-Specific Checks
+# ─────────────────────────────────────────────
+
+def check_mikrotik_default_admin(config: str, device_type: str) -> dict:
+    """Fail if default 'admin' user exists with no password on MikroTik."""
+    if re.search(r'name="admin"', config, re.IGNORECASE) and \
+       re.search(r'password=""', config, re.IGNORECASE):
+        return {
+            "check_id": "CHK-024",
+            "title": "MikroTik Default Admin No Password",
+            "severity": "FAIL",
+            "detail": "Default admin account exists with no password set.",
+            "remediation": "Set a strong password: /user set admin password=<strong-password>"
+        }
+    return {
+        "check_id": "CHK-024",
+        "title": "MikroTik Default Admin Password",
+        "severity": "PASS",
+        "detail": "Default admin account appears to have a password set.",
         "remediation": ""
     }

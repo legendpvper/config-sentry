@@ -12,11 +12,54 @@ from netmiko.exceptions import NetmikoTimeoutException, NetmikoAuthenticationExc
 
 # Commands to pull running config per device type
 CONFIG_COMMANDS = {
-    "cisco_ios":    "show running-config",
-    "cisco_ios_xe": "show running-config",
-    "cisco_xr":     "show running-config",
-    "fortinet":     "show full-configuration",
-    "paloalto_panos": "show config running",
+    # Cisco
+    "cisco_ios":        "show running-config",
+    "cisco_ios_xe":     "show running-config",
+    "cisco_xr":         "show running-config",
+    "cisco_nxos":       "show running-config",
+    "cisco_asa":        "show running-config",
+    # Fortinet
+    "fortinet":         "show full-configuration",
+    # Palo Alto
+    "paloalto_panos":   "show config running",
+    # Juniper
+    "juniper_junos":    "show configuration",
+    # Arista
+    "arista_eos":       "show running-config",
+    # Huawei
+    "huawei":           "display current-configuration",
+    "huawei_vrp":       "display current-configuration",
+    # HP / HPE
+    "hp_comware":       "display current-configuration",
+    "hp_procurve":      "show running-config",
+    # Dell
+    "dell_os10":        "show running-configuration",
+    "dell_powerconnect": "show running-config",
+    # Mikrotik
+    "mikrotik_routeros": "/export",
+    # Ubiquiti
+    "ubiquiti_edge":    "show configuration",
+}
+
+# Vendor family groupings for applying the right checks
+VENDOR_FAMILY = {
+    "cisco_ios":        "cisco",
+    "cisco_ios_xe":     "cisco",
+    "cisco_xr":         "cisco_xr",
+    "cisco_nxos":       "cisco_nxos",
+    "cisco_asa":        "cisco_asa",
+    "fortinet":         "fortinet",
+    "paloalto_panos":   "paloalto",
+    "juniper_junos":    "juniper",
+    "arista_eos":       "arista",
+    "huawei":           "huawei",
+    "huawei_vrp":       "huawei",
+    "hp_comware":       "hp_comware",
+    "hp_procurve":      "cisco",
+    "dell_os10":        "cisco",
+    "dell_powerconnect": "cisco",
+    "mikrotik_routeros": "mikrotik",
+    "ubiquiti_edge":    "cisco",
 }
 
 

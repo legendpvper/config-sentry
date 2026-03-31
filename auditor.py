@@ -39,7 +39,15 @@ def parse_args():
     parser.add_argument(
         "--device-type",
         default="cisco_ios",
-        choices=["cisco_ios", "cisco_ios_xe", "fortinet", "paloalto_panos"],
+        choices=[
+            "cisco_ios", "cisco_ios_xe", "cisco_xr", "cisco_nxos", "cisco_asa",
+            "fortinet", "paloalto_panos",
+            "juniper_junos", "arista_eos",
+            "huawei", "huawei_vrp",
+            "hp_comware", "hp_procurve",
+            "dell_os10", "dell_powerconnect",
+            "mikrotik_routeros", "ubiquiti_edge",
+        ],
         help="Device type for Netmiko (default: cisco_ios)"
     )
     parser.add_argument(

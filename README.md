@@ -3,12 +3,29 @@
 A Python CLI tool that SSHs into network devices, pulls their running configuration, and generates a security audit report flagging common misconfigurations.
 
 ## Supported Devices
-- Cisco IOS / IOS-XE
-- Fortinet FortiGate
-- Palo Alto PAN-OS
+
+| Device Type | Vendor | Common Use Case |
+|---|---|---|
+| `cisco_ios` | Cisco | ISR routers, Catalyst switches |
+| `cisco_ios_xe` | Cisco | Cat8k, CSR1000v |
+| `cisco_xr` | Cisco | ASR, NCS service provider routers |
+| `cisco_nxos` | Cisco | Nexus data centre switches |
+| `cisco_asa` | Cisco | ASA firewalls |
+| `fortinet` | Fortinet | FortiGate firewalls |
+| `paloalto_panos` | Palo Alto | Next-gen firewalls |
+| `juniper_junos` | Juniper | Enterprise/SP routers and switches |
+| `arista_eos` | Arista | Data centre switches |
+| `huawei` / `huawei_vrp` | Huawei | Enterprise routers and switches |
+| `hp_comware` | HP/HPE | Comware-based switches |
+| `hp_procurve` | HP/HPE | ProCurve switches |
+| `dell_os10` | Dell | PowerSwitch series |
+| `dell_powerconnect` | Dell | PowerConnect switches |
+| `mikrotik_routeros` | MikroTik | SMB routers |
+| `ubiquiti_edge` | Ubiquiti | EdgeRouter series |
 
 ## Checks Performed
 
+### Universal (all devices)
 | ID | Check | Severity |
 |---|---|---|
 | CHK-001 | Telnet enabled on VTY lines | FAIL |
@@ -22,6 +39,47 @@ A Python CLI tool that SSHs into network devices, pulls their running configurat
 | CHK-009 | VTY lines without access-class | WARNING |
 | CHK-010 | Password encryption disabled | FAIL |
 | CHK-011 | HTTP server enabled | FAIL |
+
+### Cisco-Specific
+| ID | Check | Severity |
+|---|---|---|
+| CHK-012 | CDP enabled globally | WARNING |
+| CHK-013 | IP source routing enabled | FAIL |
+
+### Cisco ASA-Specific
+| ID | Check | Severity |
+|---|---|---|
+| CHK-014 | ASDM access not restricted | FAIL |
+| CHK-015 | ICMP unreachable rate limit missing | WARNING |
+
+### Fortinet-Specific
+| ID | Check | Severity |
+|---|---|---|
+| CHK-016 | HTTP admin access enabled | FAIL |
+| CHK-017 | Admin without trusted hosts | WARNING |
+
+### Palo Alto-Specific
+| ID | Check | Severity |
+|---|---|---|
+| CHK-018 | Panorama not configured | WARNING |
+| CHK-019 | Syslog not configured | WARNING |
+
+### Juniper-Specific
+| ID | Check | Severity |
+|---|---|---|
+| CHK-020 | Root SSH login allowed | FAIL |
+| CHK-021 | NTP not configured | WARNING |
+
+### Huawei-Specific
+| ID | Check | Severity |
+|---|---|---|
+| CHK-022 | Telnet server enabled | FAIL |
+| CHK-023 | Default SNMP community | FAIL |
+
+### MikroTik-Specific
+| ID | Check | Severity |
+|---|---|---|
+| CHK-024 | Default admin with no password | FAIL |
 
 ## Installation
 
