@@ -1,0 +1,22 @@
+# devices/inventory.yaml
+# ─────────────────────────────────────────────
+# List your target devices here.
+# For Cisco DevNet Sandbox, use the credentials
+# from https://devnetsandbox.cisco.com
+# ─────────────────────────────────────────────
+
+devices:
+  - name: "Core-Router-01"
+    host: "your-device-ip-or-hostname"
+    username: "your-username"
+    password: "your-password"
+    device_type: "cisco_xr"
+    port: 22
+
+  # Uncomment and fill in for additional devices:
+  # - name: "Firewall-01"
+  #   host: "192.168.1.1"
+  #   username: "admin"
+  #   password: ""        # Leave blank to be prompted securely
+  #   device_type: "fortinet"
+  #   port: 22
