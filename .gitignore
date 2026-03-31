@@ -1,6 +1,6 @@
-# create .gitignore
-echo "reports/
+reports/
 *.pyc
 __pycache__/
 .env
-devices/inventory.yaml" > .gitignore"devices/inventory.yaml" 
+devices/inventory.yaml
+.schedules.json

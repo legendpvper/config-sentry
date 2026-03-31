@@ -55,7 +55,7 @@ Examples:
         """
     )
 
-    group = parser.add_mutually_exclusive_group(required=True)
+    group = parser.add_mutually_exclusive_group(required=False)
     group.add_argument(
         "--devices",
         help="Path to YAML inventory file (live SSH, multiple devices)"
@@ -95,6 +95,33 @@ Examples:
         "--email",
         default=None,
         help="Email address to send the report to after generation (PDF only)"
+    )
+    parser.add_argument(
+        "--schedule",
+        choices=["daily", "weekly", "monthly"],
+        default=None,
+        help="Schedule this audit to run automatically (daily/weekly/monthly)"
+    )
+    parser.add_argument(
+        "--schedule-time",
+        default="08:00",
+        help="Time to run the scheduled audit in HH:MM format (default: 08:00)"
+    )
+    parser.add_argument(
+        "--schedule-name",
+        default=None,
+        help="Custom name for the scheduled task"
+    )
+    parser.add_argument(
+        "--unschedule",
+        default=None,
+        metavar="TASK_NAME",
+        help="Remove a scheduled audit task by name"
+    )
+    parser.add_argument(
+        "--list-schedules",
+        action="store_true",
+        help="List all active ConfigSentry scheduled tasks"
     )
     parser.add_argument(
         "--out-dir",
@@ -221,6 +248,39 @@ def audit_device_offline(config_path: str, device_type: str, device_name: str = 
 
 def main():
     args = parse_args()
+
+    # ── Schedule management commands (no audit needed) ────────────
+    if args.list_schedules:
+        from scheduler import list_schedules
+        list_schedules()
+        return
+
+    if args.unschedule:
+        from scheduler import remove_schedule
+        remove_schedule(args.unschedule)
+        return
+
+    # ── Validate that an audit source is provided ─────────────────
+    if not args.devices and not args.host and not args.config_file:
+        print("[ERROR] Please specify --devices, --host, or --config-file to run an audit.")
+        print("        Run with --help for usage details.")
+        sys.exit(1)
+
+    # ── Register schedule if requested (then run immediately too) ──
+    if args.schedule:
+        from scheduler import create_schedule
+        devices_arg = args.devices or args.host or args.config_file
+        created = create_schedule(
+            devices_arg=devices_arg,
+            output_fmt=args.output,
+            email=args.email or "",
+            frequency=args.schedule,
+            time=args.schedule_time,
+            task_name=args.schedule_name
+        )
+        if not created:
+            sys.exit(1)
+        print("\n[*] Running audit now as well ...\n")
 
     # ── Offline mode ──────────────────────────────────────────────
     if args.config_file:

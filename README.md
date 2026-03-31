@@ -81,7 +81,40 @@ A Python CLI tool that SSHs into network devices, pulls their running configurat
 |---|---|---|
 | CHK-024 | Default admin with no password | FAIL |
 
-## Email Delivery
+## Scheduled Runs (Windows Task Scheduler)
+
+ConfigSentry can register itself as a Windows scheduled task so audits run automatically — no manual trigger needed.
+
+**Schedule a weekly audit:**
+```bash
+python auditor.py --devices devices/inventory.yaml --output pdf --email client@company.com --schedule weekly
+```
+
+**Schedule a daily audit at a specific time:**
+```bash
+python auditor.py --devices devices/inventory.yaml --output pdf --email client@company.com --schedule daily --schedule-time 09:00
+```
+
+**List all active schedules:**
+```bash
+python auditor.py --list-schedules
+```
+
+**Remove a scheduled task:**
+```bash
+python auditor.py --unschedule audit_inventory
+```
+
+> Manual runs still work exactly as before — `--schedule` is purely optional.
+> Scheduling requires Windows. On Linux/Mac, use cron instead (see below).
+
+**Linux/Mac cron equivalent:**
+```bash
+# Run weekly every Monday at 8am
+0 8 * * 1 /usr/bin/python3 /path/to/auditor.py --devices /path/to/inventory.yaml --output pdf --email client@company.com
+```
+
+
 
 ConfigSentry can automatically email the PDF report to any recipient after an audit.
 
