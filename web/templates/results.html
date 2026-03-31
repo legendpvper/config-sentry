@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ConfigSentry — Audit Results</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#080b12;--surface:#0f1420;--surface2:#141926;--border:#1e2535;
+    --blue:#4d9fff;--text:#e2e8f0;--muted:#5a6a85;
+    --fail-bg:#2a0f0f;--fail-fg:#ff5555;--warn-bg:#2a1a0a;--warn-fg:#ffb347;
+    --pass-bg:#0a1f0f;--pass-fg:#50fa7b;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(77,159,255,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(77,159,255,0.02) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
+  .topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;padding:1rem 2rem;border-bottom:1px solid var(--border);background:rgba(8,11,18,0.92);backdrop-filter:blur(12px)}
+  .logo{font-family:'Space Mono',monospace;font-size:1rem;color:var(--blue);text-decoration:none;display:flex;align-items:center;gap:0.5rem}
+  .logo-dot{width:7px;height:7px;background:var(--blue);border-radius:50%;animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+  .topbar-actions{display:flex;gap:0.75rem;flex-wrap:wrap}
+  .btn{display:inline-flex;align-items:center;gap:0.4rem;padding:0.5rem 1rem;border-radius:7px;font-size:0.82rem;font-weight:500;text-decoration:none;cursor:pointer;transition:all 0.2s;border:none}
+  .btn-primary{background:var(--blue);color:#080b12;font-family:'Space Mono',monospace;font-size:0.78rem;font-weight:700}
+  .btn-primary:hover{background:#6ab3ff}
+  .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
+  .btn-ghost:hover{color:var(--text);border-color:var(--blue)}
+  .container{position:relative;z-index:1;max-width:960px;margin:0 auto;padding:2.5rem 1.5rem 4rem}
+  .device-header{margin-bottom:1.25rem}
+  .device-header h1{font-family:'Space Mono',monospace;font-size:1.4rem;margin-bottom:0.3rem}
+  .device-meta{font-size:0.82rem;color:var(--muted);display:flex;gap:1rem;flex-wrap:wrap}
+  .mode-badge{display:inline-block;padding:0.15rem 0.5rem;border-radius:4px;font-size:0.7rem;font-weight:700;background:var(--surface2);color:var(--muted);font-family:'Space Mono',monospace}
+  .score-card{display:flex;align-items:center;gap:2rem;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1.5rem 2rem;margin-bottom:1.5rem;position:relative;overflow:hidden}
+  .score-card::after{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+  .score-card.low::after{background:var(--pass-fg)}.score-card.guarded::after{background:var(--blue)}.score-card.elevated::after{background:var(--warn-fg)}.score-card.high::after{background:var(--fail-fg)}.score-card.critical::after{background:#cc2200}
+  .score-num{font-family:'Space Mono',monospace;font-size:3rem;font-weight:700;line-height:1;white-space:nowrap}
+  .score-num .denom{font-size:1.2rem;opacity:0.5}
+  .score-num.low{color:var(--pass-fg)}.score-num.guarded{color:var(--blue)}.score-num.elevated{color:var(--warn-fg)}.score-num.high{color:var(--fail-fg)}.score-num.critical{color:#ff3311}
+  .risk-label{font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;margin-bottom:0.3rem}
+  .risk-label.low{color:var(--pass-fg)}.risk-label.guarded{color:var(--blue)}.risk-label.elevated{color:var(--warn-fg)}.risk-label.high{color:var(--fail-fg)}.risk-label.critical{color:#ff3311}
+  .risk-summary{font-size:0.88rem;color:var(--muted);margin-bottom:0.75rem}
+  .summary-pills{display:flex;gap:0.5rem}
+  .pill{padding:0.2rem 0.7rem;border-radius:999px;font-size:0.75rem;font-weight:700;font-family:'Space Mono',monospace}
+  .pill-fail{background:var(--fail-bg);color:var(--fail-fg)}.pill-warning{background:var(--warn-bg);color:var(--warn-fg)}.pill-pass{background:var(--pass-bg);color:var(--pass-fg)}
+  .downloads{display:flex;gap:0.75rem;margin-bottom:2rem;flex-wrap:wrap}
+  .section-title{font-family:'Space Mono',monospace;font-size:0.78rem;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:0.75rem;margin-top:2rem}
+  .finding{background:var(--surface);border:1px solid var(--border);border-left:3px solid transparent;border-radius:10px;padding:1rem 1.25rem;margin-bottom:0.6rem;transition:border-color 0.15s}
+  .finding:hover{border-color:var(--blue)}
+  .finding.fail{border-left-color:var(--fail-fg);background:var(--fail-bg)}.finding.warning{border-left-color:var(--warn-fg);background:var(--warn-bg)}.finding.pass{border-left-color:var(--pass-fg);background:var(--pass-bg)}
+  .finding-header{display:flex;align-items:center;gap:0.75rem;margin-bottom:0.4rem}
+  .finding-id{font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);white-space:nowrap}
+  .severity-badge{padding:0.15rem 0.55rem;border-radius:4px;font-size:0.7rem;font-weight:700;font-family:'Space Mono',monospace;white-space:nowrap}
+  .badge-fail{background:rgba(255,85,85,0.2);color:var(--fail-fg)}.badge-warning{background:rgba(255,179,71,0.2);color:var(--warn-fg)}.badge-pass{background:rgba(80,250,123,0.2);color:var(--pass-fg)}
+  .finding-title{font-weight:500;font-size:0.9rem}
+  .finding-detail{font-size:0.82rem;color:var(--muted);margin-top:0.25rem;line-height:1.6}
+  .finding-remediation{font-size:0.8rem;color:var(--blue);margin-top:0.35rem}
+  .new-audit{margin-top:3rem;padding:2rem;background:var(--surface);border:1px solid var(--border);border-radius:14px;text-align:center}
+  .new-audit p{font-size:0.9rem;color:var(--muted);margin-bottom:1rem}
+</style>
+</head>
+<body>
+
+<nav class="topbar">
+  <a href="/" class="logo"><div class="logo-dot"></div>ConfigSentry</a>
+  <a href="/" class="btn btn-ghost">← New Audit</a>
+</nav>
+
+<div class="container">
+
+{% set r = results[0] %}
+{% set lc = r.score.risk_level | lower %}
+
+<div class="device-header">
+  <h1>{{ r.hostname }}</h1>
+  <div class="device-meta">
+    <span>📄 {{ r.host }}</span>
+    <span>🖥 {{ device_type }}</span>
+    <span>🕐 {{ timestamp }}</span>
+    <span class="mode-badge">OFFLINE</span>
+  </div>
+</div>
+
+<div class="score-card {{ lc }}">
+  <div class="score-num {{ lc }}">{{ r.score.score }}<span class="denom">/100</span></div>
+  <div>
+    <div class="risk-label {{ lc }}">{{ r.score.risk_level }} RISK</div>
+    <div class="risk-summary">{{ r.score.summary }}</div>
+    <div class="summary-pills">
+      <span class="pill pill-fail">{{ r.fails | length }} FAIL</span>
+      <span class="pill pill-warning">{{ r.warnings | length }} WARNING</span>
+      <span class="pill pill-pass">{{ r.passes | length }} PASS</span>
+    </div>
+  </div>
+</div>
+
+<div class="downloads">
+  <a href="{{ pdf_url }}" class="btn btn-primary" download>↓ Download PDF Report</a>
+  {% for rf in rem_files %}
+  <a href="{{ rf.url }}" class="btn btn-ghost" download>↓ Download Remediation Script</a>
+  {% endfor %}
+</div>
+
+{% if r.fails %}
+<div class="section-title">⚠ Critical Findings — {{ r.fails | length }} item{{ 's' if r.fails | length != 1 }}</div>
+{% for f in r.fails %}
+<div class="finding fail">
+  <div class="finding-header"><span class="finding-id">{{ f.check_id }}</span><span class="severity-badge badge-fail">FAIL</span><span class="finding-title">{{ f.title }}</span></div>
+  <div class="finding-detail">{{ f.detail }}</div>
+  {% if f.remediation %}<div class="finding-remediation">→ {{ f.remediation }}</div>{% endif %}
+</div>
+{% endfor %}
+{% endif %}
+
+{% if r.warnings %}
+<div class="section-title">△ Warnings — {{ r.warnings | length }} item{{ 's' if r.warnings | length != 1 }}</div>
+{% for f in r.warnings %}
+<div class="finding warning">
+  <div class="finding-header"><span class="finding-id">{{ f.check_id }}</span><span class="severity-badge badge-warning">WARNING</span><span class="finding-title">{{ f.title }}</span></div>
+  <div class="finding-detail">{{ f.detail }}</div>
+  {% if f.remediation %}<div class="finding-remediation">→ {{ f.remediation }}</div>{% endif %}
+</div>
+{% endfor %}
+{% endif %}
+
+{% if r.passes %}
+<div class="section-title">✓ Passed — {{ r.passes | length }} item{{ 's' if r.passes | length != 1 }}</div>
+{% for f in r.passes %}
+<div class="finding pass">
+  <div class="finding-header"><span class="finding-id">{{ f.check_id }}</span><span class="severity-badge badge-pass">PASS</span><span class="finding-title">{{ f.title }}</span></div>
+  <div class="finding-detail">{{ f.detail }}</div>
+</div>
+{% endfor %}
+{% endif %}
+
+<div class="new-audit">
+  <p>Want to audit another device?</p>
+  <a href="/" class="btn btn-primary">← Run Another Audit</a>
+</div>
+
+</div>
+</body>
+</html>

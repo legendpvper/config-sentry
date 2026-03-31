@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ConfigSentry — Network Audit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #080b12;
+    --surface:  #0f1420;
+    --border:   #1e2535;
+    --blue:     #4d9fff;
+    --blue-dim: #1a3a6e;
+    --text:     #e2e8f0;
+    --muted:    #5a6a85;
+    --fail:     #ff5555;
+    --warn:     #ffb347;
+    --pass:     #50fa7b;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Grid background ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(77,159,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(77,159,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── Top bar ── */
+  .topbar {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 2.5rem;
+    border-bottom: 1px solid var(--border);
+    background: rgba(8,11,18,0.8);
+    backdrop-filter: blur(12px);
+  }
+
+  .logo {
+    font-family: 'Space Mono', monospace;
+    font-size: 1.1rem;
+    color: var(--blue);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .logo-dot {
+    width: 8px; height: 8px;
+    background: var(--blue);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  .topbar-link {
+    font-size: 0.85rem;
+    color: var(--muted);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .topbar-link:hover { color: var(--blue); }
+
+  /* ── Hero ── */
+  .hero {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 1.5rem 3rem;
+    text-align: center;
+  }
+
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: var(--blue-dim);
+    color: var(--blue);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.72rem;
+    padding: 0.3rem 0.8rem;
+    border-radius: 999px;
+    border: 1px solid rgba(77,159,255,0.3);
+    margin-bottom: 1.5rem;
+    letter-spacing: 0.05em;
+  }
+
+  .hero h1 {
+    font-family: 'Space Mono', monospace;
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 700;
+    line-height: 1.15;
+    margin-bottom: 1rem;
+    letter-spacing: -0.02em;
+  }
+
+  .hero h1 span { color: var(--blue); }
+
+  .hero p {
+    font-size: 1.1rem;
+    color: var(--muted);
+    max-width: 520px;
+    line-height: 1.7;
+    margin-bottom: 3rem;
+    font-weight: 300;
+  }
+
+  /* ── Upload card ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2.5rem;
+    width: 100%;
+    max-width: 560px;
+    position: relative;
+  }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 60%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--blue), transparent);
+  }
+
+  /* ── Drop zone ── */
+  .dropzone {
+    border: 1.5px dashed var(--border);
+    border-radius: 10px;
+    padding: 2.5rem 1.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 1.5rem;
+    position: relative;
+  }
+
+  .dropzone:hover, .dropzone.drag-over {
+    border-color: var(--blue);
+    background: rgba(77,159,255,0.04);
+  }
+
+  .dropzone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  .dropzone-icon {
+    font-size: 2rem;
+    margin-bottom: 0.75rem;
+    display: block;
+  }
+
+  .dropzone-text {
+    font-size: 0.95rem;
+    color: var(--muted);
+    margin-bottom: 0.25rem;
+  }
+
+  .dropzone-text strong { color: var(--blue); }
+
+  .dropzone-sub {
+    font-size: 0.78rem;
+    color: var(--muted);
+    opacity: 0.6;
+  }
+
+  .file-selected {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--pass);
+    margin-top: 0.5rem;
+    display: none;
+  }
+
+  /* ── Form fields ── */
+  .field { margin-bottom: 1.25rem; }
+
+  .field label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--muted);
+    margin-bottom: 0.4rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .field input, .field select {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.7rem 1rem;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.2s;
+    appearance: none;
+  }
+
+  .field input:focus, .field select:focus {
+    border-color: var(--blue);
+  }
+
+  /* ── Submit button ── */
+  .btn-submit {
+    width: 100%;
+    padding: 0.9rem;
+    background: var(--blue);
+    color: #080b12;
+    border: none;
+    border-radius: 8px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.03em;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-submit:hover {
+    background: #6ab3ff;
+    transform: translateY(-1px);
+  }
+
+  .btn-submit:active { transform: translateY(0); }
+
+  .btn-submit.loading {
+    pointer-events: none;
+    opacity: 0.7;
+  }
+
+  /* ── Feature pills ── */
+  .features {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 2rem;
+  }
+
+  .feature {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.78rem;
+    color: var(--muted);
+    padding: 0.3rem 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+  }
+
+  .feature-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+  }
+
+  /* ── Footer ── */
+  footer {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    padding: 1.5rem;
+    font-size: 0.78rem;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+  }
+
+  footer a { color: var(--blue); text-decoration: none; }
+
+  /* ── Loading overlay ── */
+  .loading-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(8,11,18,0.92);
+    z-index: 100;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+  }
+
+  .loading-overlay.active { display: flex; }
+
+  .spinner {
+    width: 48px; height: 48px;
+    border: 3px solid var(--border);
+    border-top-color: var(--blue);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-text {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.85rem;
+    color: var(--blue);
+  }
+
+  .loading-sub {
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="loading-text">Running audit checks...</div>
+  <div class="loading-sub" id="loadingSub">Analysing configuration against 24 security checks</div>
+</div>
+
+<nav class="topbar">
+  <a href="/" class="logo">
+    <div class="logo-dot"></div>
+    ConfigSentry
+  </a>
+  <a href="https://github.com/legendpvper/config-sentry" class="topbar-link" target="_blank">GitHub →</a>
+</nav>
+
+<main class="hero">
+  <div class="hero-badge">
+    <span>▸</span> Network Security Auditor
+  </div>
+
+  <h1>Audit your network<br><span>configuration</span> instantly</h1>
+
+  <p>Upload a device config file and get a professional security report in seconds. No Python. No terminal. No setup.</p>
+
+  <div class="card">
+    <form method="POST" action="/audit" enctype="multipart/form-data" id="auditForm">
+
+      <div class="dropzone" id="dropzone">
+        <input type="file" name="config_file" id="fileInput" accept=".txt,.conf,.cfg,.log" required>
+        <span class="dropzone-icon">📄</span>
+        <div class="dropzone-text"><strong>Click to upload</strong> or drag and drop</div>
+        <div class="dropzone-sub">Supports .txt .conf .cfg — running-config output</div>
+        <div class="file-selected" id="fileSelected"></div>
+      </div>
+
+      <div class="field">
+        <label>Device Type</label>
+        <select name="device_type" required>
+          {% for value, label in device_types %}
+          <option value="{{ value }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="field" id="deviceNameField">
+        <label>Device Name <span style="opacity:0.5">(optional)</span></label>
+        <input type="text" name="device_name" placeholder="e.g. Core-Router-01">
+      </div>
+
+      <button type="submit" class="btn-submit" id="submitBtn">
+        Run Security Audit →
+      </button>
+
+    </form>
+  </div>
+
+  <div class="features">
+    <div class="feature">
+      <div class="feature-dot" style="background:#50fa7b"></div>
+      24 security checks
+    </div>
+    <div class="feature">
+      <div class="feature-dot" style="background:#4d9fff"></div>
+      14 device types
+    </div>
+    <div class="feature">
+      <div class="feature-dot" style="background:#ffb347"></div>
+      PDF + remediation script
+    </div>
+    <div class="feature">
+      <div class="feature-dot" style="background:#ff79c6"></div>
+      No data stored
+    </div>
+  </div>
+</main>
+
+<footer>
+  Built by <a href="https://github.com/legendpvper/config-sentry" target="_blank">ConfigSentry</a>
+  &nbsp;·&nbsp; No config data is stored or logged.
+</footer>
+
+<script>
+  const dropzone     = document.getElementById('dropzone');
+  const fileInput    = document.getElementById('fileInput');
+  const fileSelected = document.getElementById('fileSelected');
+  const form         = document.getElementById('auditForm');
+  const overlay      = document.getElementById('loadingOverlay');
+  const submitBtn    = document.getElementById('submitBtn');
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files.length > 0) {
+      fileSelected.style.display = 'block';
+      fileSelected.textContent   = '✓ ' + fileInput.files[0].name;
+      dropzone.style.borderColor = 'var(--pass-fg)';
+    }
+  });
+
+  dropzone.addEventListener('dragover', e => {
+    e.preventDefault();
+    dropzone.classList.add('drag-over');
+  });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+  dropzone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropzone.classList.remove('drag-over');
+    if (e.dataTransfer.files.length > 0) {
+      fileInput.files = e.dataTransfer.files;
+      fileSelected.style.display = 'block';
+      fileSelected.textContent   = '✓ ' + e.dataTransfer.files[0].name;
+      dropzone.style.borderColor = 'var(--pass-fg)';
+    }
+  });
+
+  form.addEventListener('submit', () => {
+    overlay.classList.add('active');
+    submitBtn.classList.add('loading');
+    submitBtn.textContent = 'Analysing...';
+  });
+</script>
+
+</body>
+</html>

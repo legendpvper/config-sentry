@@ -1,0 +1,41 @@
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! ConfigSentry — Remediation Script
+! Device   : test-config (test-config.txt)
+! Vendor   : cisco_ios
+! Score    : 83/100 — GUARDED
+! Generated: 2026-03-31 23:02:20
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!
+! IMPORTANT: Review all commands before applying.
+! Replace all placeholders in <ANGLE-BRACKETS> with real values.
+! Test in a lab or maintenance window before production use.
+!
+
+!───────────────────────────────────────────────────────────────
+! CRITICAL FIXES (1 items) — Apply immediately
+!───────────────────────────────────────────────────────────────
+
+! [CHK-010] Password Encryption Disabled
+! Issue: service password-encryption is not enabled. Passwords in config may be stored in plaintext.
+!
+service password-encryption
+
+!───────────────────────────────────────────────────────────────
+! RECOMMENDED FIXES (2 items) — Apply when possible
+!───────────────────────────────────────────────────────────────
+
+! [CHK-002] SSH Version Not Explicitly Set
+! Issue: SSH version 2 is not explicitly configured. Device may fall back to SSHv1.
+!
+ip ssh version 2
+
+! [CHK-005] NTP Not Configured
+! Issue: No NTP server configured. Accurate timestamps are critical for log correlation and incident response
+!
+ntp server <NTP-SERVER-IP> prefer
+ntp server <NTP-SERVER-IP-2>
+! Common public NTP: 1.pool.ntp.org / time.google.com
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! END OF REMEDIATION SCRIPT
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
