@@ -1,6 +1,21 @@
-# Network Device Configuration Auditor
+# ConfigSentry
 
-A Python CLI tool that SSHs into network devices, pulls their running configuration, and generates a security audit report flagging common misconfigurations.
+A network device configuration auditor with two ways to use it — a web dashboard for non-technical users and a Python CLI for engineers and automation workflows.
+
+**🌐 Web Dashboard:** [config-sentry.onrender.com](https://config-sentry.onrender.com)
+**💻 CLI:** Full-featured command line tool with SSH, offline, PDF, email and scheduled audit support.
+
+---
+
+## Two Ways to Use ConfigSentry
+
+### 1. Web Dashboard (no setup needed)
+Upload a saved config file at [config-sentry.onrender.com](https://config-sentry.onrender.com) and get a security report instantly in your browser. No Python. No terminal. No installation.
+
+### 2. Python CLI
+For engineers who want live SSH audits, automated scheduling, email delivery, and full control over the audit pipeline.
+
+---
 
 ## Supported Devices
 
@@ -22,6 +37,8 @@ A Python CLI tool that SSHs into network devices, pulls their running configurat
 | `dell_powerconnect` | Dell | PowerConnect switches |
 | `mikrotik_routeros` | MikroTik | SMB routers |
 | `ubiquiti_edge` | Ubiquiti | EdgeRouter series |
+
+---
 
 ## Checks Performed
 
@@ -81,69 +98,87 @@ A Python CLI tool that SSHs into network devices, pulls their running configurat
 |---|---|---|
 | CHK-024 | Default admin with no password | FAIL |
 
-## Remediation Scripts
+---
 
-Add `--remediation` to any audit command and ConfigSentry will generate a ready-to-paste CLI fix script for every FAIL and WARNING finding:
+## Risk Scoring
 
+Every audited device receives a **0-100 risk score** based on weighted findings:
+
+| Score | Risk Level | Meaning |
+|---|---|---|
+| 90-100 | LOW | Well-hardened, minor improvements possible |
+| 70-89 | GUARDED | Generally secure, some areas need attention |
+| 50-69 | ELEVATED | Notable gaps present, remediation recommended |
+| 30-49 | HIGH | Significant misconfigurations, prompt action required |
+| 0-29 | CRITICAL | Severe gaps, immediate remediation required |
+
+Each check carries a weight reflecting its real-world impact. FAIL deducts full weight, WARNING deducts half.
+
+---
+
+## CLI Installation
+
+```bash
+git clone https://github.com/legendpvper/config-sentry.git
+cd config-sentry
+pip install -r requirements.txt
+```
+
+## CLI Usage
+
+**Single device (live SSH):**
+```bash
+python auditor.py --host 192.168.1.1 --username admin --device-type cisco_ios
+```
+
+**Multiple devices from inventory file:**
+```bash
+python auditor.py --devices devices/inventory.yaml --output pdf
+```
+
+**Offline mode - audit a saved config file (no SSH needed):**
+```bash
+python auditor.py --config-file running-config.txt --device-type cisco_ios
+python auditor.py --config-file fortigate.conf --device-type fortinet --device-name Firewall-01 --output pdf
+```
+
+**With remediation script:**
 ```bash
 python auditor.py --devices devices/inventory.yaml --output pdf --remediation
 ```
 
-The script is saved to the `reports/` directory alongside the report:
+Reports are saved to the `reports/` directory.
+
+---
+
+## Remediation Scripts
+
+Add `--remediation` to any audit command to generate a ready-to-paste CLI fix script for every FAIL and WARNING finding:
+
+```bash
+python auditor.py --config-file running-config.txt --device-type cisco_ios --output pdf --remediation
+```
+
+Output in `reports/`:
 ```
 reports/
 ├── audit_20260331_120000.pdf
 └── remediation_Core-Router-01_20260331_120000.txt
 ```
 
-Each finding includes the exact vendor-specific commands needed to fix it, with placeholders clearly marked in `<ANGLE-BRACKETS>`. Critical fixes are listed first, followed by recommended improvements.
+Each finding includes exact vendor-specific commands with placeholders in `<ANGLE-BRACKETS>`. Critical fixes are listed first.
 
+---
 
+## Email Delivery
 
-ConfigSentry can register itself as a Windows scheduled task so audits run automatically — no manual trigger needed.
-
-**Schedule a weekly audit:**
-```bash
-python auditor.py --devices devices/inventory.yaml --output pdf --email client@company.com --schedule weekly
-```
-
-**Schedule a daily audit at a specific time:**
-```bash
-python auditor.py --devices devices/inventory.yaml --output pdf --email client@company.com --schedule daily --schedule-time 09:00
-```
-
-**List all active schedules:**
-```bash
-python auditor.py --list-schedules
-```
-
-**Remove a scheduled task:**
-```bash
-python auditor.py --unschedule audit_inventory
-```
-
-> Manual runs still work exactly as before — `--schedule` is purely optional.
-> Scheduling requires Windows. On Linux/Mac, use cron instead (see below).
-
-**Linux/Mac cron equivalent:**
-```bash
-# Run weekly every Monday at 8am
-0 8 * * 1 /usr/bin/python3 /path/to/auditor.py --devices /path/to/inventory.yaml --output pdf --email client@company.com
-```
-
-
-
-ConfigSentry can automatically email the PDF report to any recipient after an audit.
-
-**Setup:**
-
-1. Create a `.env` file in the project root:
+**Setup - create a `.env` file in the project root:**
 ```
 CONFIGSENTRY_EMAIL=configsentry@gmail.com
 CONFIGSENTRY_APP_PASSWORD=your_16_char_app_password
 ```
 
-2. Generate a Gmail App Password at [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
+Generate a Gmail App Password at [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords).
 
 **Usage:**
 ```bash
@@ -154,71 +189,70 @@ The recipient receives a formatted HTML email with a summary table and the full 
 
 > The `.env` file is gitignored and never committed.
 
+---
 
-
-Every audited device receives a **0–100 risk score** based on weighted findings:
-
-| Score | Risk Level | Meaning |
-|---|---|---|
-| 90–100 | LOW | Well-hardened, minor improvements possible |
-| 70–89 | GUARDED | Generally secure, some areas need attention |
-| 50–69 | ELEVATED | Notable gaps present, remediation recommended |
-| 30–49 | HIGH | Significant misconfigurations, prompt action required |
-| 0–29 | CRITICAL | Severe gaps, immediate remediation required |
-
-Each check carries a weight reflecting its real-world impact. A Telnet-enabled device loses more points than a missing NTP server. FAIL deducts full weight, WARNING deducts half.
-
-
+## Scheduled Runs (Windows Task Scheduler)
 
 ```bash
-git clone https://github.com/yourusername/net-auditor.git
-cd net-auditor
-pip install -r requirements.txt
+# Schedule a weekly audit
+python auditor.py --devices devices/inventory.yaml --output pdf --email client@company.com --schedule weekly
+
+# Schedule a daily audit at a specific time
+python auditor.py --devices devices/inventory.yaml --output pdf --email client@company.com --schedule daily --schedule-time 09:00
+
+# List all active schedules
+python auditor.py --list-schedules
+
+# Remove a scheduled task
+python auditor.py --unschedule audit_inventory
 ```
 
-## Usage
+> Manual runs still work exactly as before - `--schedule` is purely optional.
 
-**Single device (live SSH):**
+**Linux/Mac cron equivalent:**
 ```bash
-python auditor.py --host 192.168.1.1 --username admin --device-type cisco_ios
+0 8 * * 1 /usr/bin/python3 /path/to/auditor.py --devices /path/to/inventory.yaml --output pdf --email client@company.com
 ```
 
-**Multiple devices from inventory file (live SSH):**
-```bash
-python auditor.py --devices devices/inventory.yaml --output html
-python auditor.py --devices devices/inventory.yaml --output pdf
-```
-
-**Offline mode — audit a saved config file (no SSH needed):**
-```bash
-python auditor.py --config-file running-config.txt --device-type cisco_ios
-python auditor.py --config-file fortigate.conf --device-type fortinet --device-name Firewall-01 --output pdf
-```
-
-Reports are saved to the `reports/` directory.
+---
 
 ## Quick Start with Cisco DevNet Sandbox
 
-No physical hardware needed. Use Cisco's free always-on sandbox:
+No physical hardware needed:
 
-1. Go to https://devnetsandbox.cisco.com
-2. Use the always-on IOS-XE sandbox (no reservation needed)
-3. Update `devices/inventory.yaml` with the sandbox credentials
+1. Go to [devnetsandbox.cisco.com](https://devnetsandbox.cisco.com)
+2. Launch the **IOS XR Always-On** sandbox and get credentials from the I/O tab
+3. Update `devices/inventory.yaml` with the credentials
 4. Run: `python auditor.py --devices devices/inventory.yaml --output html`
+
+---
 
 ## Project Structure
 
 ```
-net-auditor/
+config-sentry/
 ├── auditor.py          # Main CLI entry point
 ├── connector.py        # SSH connection handler (Netmiko)
-├── checks.py           # All audit check logic
-├── reporter.py         # Text and HTML report generation
+├── checks.py           # All audit check logic (24 checks)
+├── scorer.py           # Risk scoring engine
+├── reporter.py         # Text, HTML and PDF report generation
+├── remediator.py       # CLI remediation script generator
+├── emailer.py          # Email delivery via Gmail SMTP
+├── scheduler.py        # Windows Task Scheduler integration
 ├── requirements.txt
 ├── devices/
-│   └── inventory.yaml  # Device list
-└── reports/            # Generated reports saved here
+│   └── inventory.example.yaml
+├── reports/            # Generated reports saved here
+└── web/                # Web dashboard (FastAPI)
+    ├── app.py
+    ├── requirements.txt
+    ├── Procfile
+    └── templates/
+        ├── index.html
+        └── results.html
 ```
+
+---
 
 ## Adding New Checks
 
@@ -228,14 +262,14 @@ Open `checks.py` and add a new function following this pattern:
 def check_your_new_check(config: str, device_type: str) -> dict:
     if re.search(r"your-pattern", config, re.IGNORECASE):
         return {
-            "check_id": "CHK-012",
+            "check_id": "CHK-025",
             "title": "Your Check Title",
             "severity": "FAIL",  # or "WARNING"
             "detail": "What was found.",
             "remediation": "How to fix it."
         }
     return {
-        "check_id": "CHK-012",
+        "check_id": "CHK-025",
         "title": "Your Check Title",
         "severity": "PASS",
         "detail": "All good.",
