@@ -58,6 +58,46 @@ CHECK_WEIGHTS = {
 
     # MikroTik-specific
     "CHK-024": 20,   # Default admin no password — worst possible finding
+
+    # ── New Universal Checks ──────────────────────────────────────────────────
+    "CHK-025":  6,   # Syslog not configured — log integrity / SIEM gap
+    "CHK-026":  7,   # SNMPv3 not in use — community strings in plaintext
+
+    # ── New Cisco-Family Checks ───────────────────────────────────────────────
+    "CHK-027":  8,   # AAA not configured — no centralised auth/accounting
+    "CHK-028":  7,   # No TACACS+/RADIUS — local-only authentication
+    "CHK-029":  6,   # VTY session timeout missing — idle session hijack risk
+    "CHK-030":  5,   # Console timeout missing — unattended physical console
+    "CHK-031":  8,   # OSPF auth missing — routing table poisoning risk
+    "CHK-032":  9,   # BGP auth missing — session hijack / route injection
+    "CHK-033":  7,   # HSRP/VRRP auth missing — active gateway hijack
+    "CHK-034":  8,   # IP directed broadcast — Smurf DDoS amplification
+    "CHK-035":  9,   # Weak VPN encryption (DES/3DES) — traffic decryption risk
+
+    # ── New Cisco ASA Checks ──────────────────────────────────────────────────
+    "CHK-036":  6,   # ASA logging not enabled — no firewall event capture
+    "CHK-037":  7,   # ASA threat detection missing — no scan/DoS tracking
+
+    # ── New Fortinet Checks ───────────────────────────────────────────────────
+    "CHK-038":  5,   # Admin timeout not set/too long — unattended session risk
+    "CHK-039":  6,   # FortiGate remote logging missing — logs stored locally only
+
+    # ── New Palo Alto Checks ──────────────────────────────────────────────────
+    "CHK-040":  7,   # Zone protection profile missing — flood/recon attack risk
+    "CHK-041":  5,   # URL filtering missing — malicious/prohibited web access
+
+    # ── New Juniper Checks ────────────────────────────────────────────────────
+    "CHK-042":  8,   # OSPF auth missing — route injection risk
+    "CHK-043":  9,   # BGP auth missing — session hijack / route injection
+    "CHK-044":  5,   # Session idle timeout not set — unattended session risk
+
+    # ── New Huawei Checks ─────────────────────────────────────────────────────
+    "CHK-045":  7,   # SNMPv3 not configured — community strings exposed
+    "CHK-046":  8,   # AAA not configured — no centralised auth/accounting
+
+    # ── New MikroTik Checks ───────────────────────────────────────────────────
+    "CHK-047":  6,   # UPnP enabled — automatic port opening, malware risk
+    "CHK-048":  7,   # Winbox unrestricted — CVE-exposed management interface
 }
 
 DEFAULT_WEIGHT = 5  # Fallback weight for any check not in the table

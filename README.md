@@ -56,47 +56,71 @@ For engineers who want live SSH audits, automated scheduling, email delivery, an
 | CHK-009 | VTY lines without access-class | WARNING |
 | CHK-010 | Password encryption disabled | FAIL |
 | CHK-011 | HTTP server enabled | FAIL |
+| CHK-025 | Syslog server not configured | WARNING |
+| CHK-026 | SNMPv3 not in use | WARNING |
 
 ### Cisco-Specific
 | ID | Check | Severity |
 |---|---|---|
 | CHK-012 | CDP enabled globally | WARNING |
 | CHK-013 | IP source routing enabled | FAIL |
+| CHK-027 | AAA not configured | WARNING |
+| CHK-028 | No TACACS+/RADIUS server configured | WARNING |
+| CHK-029 | VTY session timeout not set | WARNING |
+| CHK-030 | Console session timeout not set | WARNING |
+| CHK-031 | OSPF authentication not configured | WARNING |
+| CHK-032 | BGP MD5 authentication missing | WARNING |
+| CHK-033 | HSRP/VRRP authentication missing | WARNING |
+| CHK-034 | IP directed broadcast enabled | FAIL |
+| CHK-035 | Weak VPN encryption (DES/3DES) | WARNING |
 
 ### Cisco ASA-Specific
 | ID | Check | Severity |
 |---|---|---|
 | CHK-014 | ASDM access not restricted | FAIL |
 | CHK-015 | ICMP unreachable rate limit missing | WARNING |
+| CHK-036 | ASA logging not enabled | WARNING |
+| CHK-037 | ASA threat detection not configured | WARNING |
 
 ### Fortinet-Specific
 | ID | Check | Severity |
 |---|---|---|
 | CHK-016 | HTTP admin access enabled | FAIL |
 | CHK-017 | Admin without trusted hosts | WARNING |
+| CHK-038 | Admin session timeout not set / too long | WARNING |
+| CHK-039 | Remote logging not configured | WARNING |
 
 ### Palo Alto-Specific
 | ID | Check | Severity |
 |---|---|---|
 | CHK-018 | Panorama not configured | WARNING |
 | CHK-019 | Syslog not configured | WARNING |
+| CHK-040 | Zone protection profile missing | WARNING |
+| CHK-041 | URL filtering profile missing | WARNING |
 
 ### Juniper-Specific
 | ID | Check | Severity |
 |---|---|---|
 | CHK-020 | Root SSH login allowed | FAIL |
 | CHK-021 | NTP not configured | WARNING |
+| CHK-042 | OSPF authentication missing | WARNING |
+| CHK-043 | BGP authentication missing | WARNING |
+| CHK-044 | Session idle timeout not set | WARNING |
 
 ### Huawei-Specific
 | ID | Check | Severity |
 |---|---|---|
 | CHK-022 | Telnet server enabled | FAIL |
 | CHK-023 | Default SNMP community | FAIL |
+| CHK-045 | SNMPv3 not configured | WARNING |
+| CHK-046 | AAA not configured | WARNING |
 
 ### MikroTik-Specific
 | ID | Check | Severity |
 |---|---|---|
 | CHK-024 | Default admin with no password | FAIL |
+| CHK-047 | UPnP enabled | WARNING |
+| CHK-048 | Winbox accessible from any address | WARNING |
 
 ---
 

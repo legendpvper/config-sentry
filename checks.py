@@ -35,21 +35,44 @@ def run_all_checks(config: str, device_type: str) -> list[dict]:
         check_vty_access_class,
         check_service_password_encryption,
         check_http_server_enabled,
+        # New universal checks
+        check_syslog_configured,        # CHK-025
+        check_snmpv3_not_used,          # CHK-026
     ]
 
     # Vendor-specific additional checks
     vendor_checks = {
-        "cisco":      [check_cdp_enabled, check_ip_source_route],
-        "cisco_xr":   [check_ip_source_route],
-        "cisco_nxos": [check_cdp_enabled],
-        "cisco_asa":  [check_asa_asdm_enabled, check_asa_icmp_unreachable],
-        "fortinet":   [check_fortinet_admin_https, check_fortinet_trusted_hosts],
-        "paloalto":   [check_paloalto_panorama, check_paloalto_syslog],
-        "juniper":    [check_juniper_root_login, check_juniper_ntp],
-        "arista":     [check_cdp_enabled],
-        "huawei":     [check_huawei_telnet, check_huawei_snmp],
+        "cisco":      [check_cdp_enabled, check_ip_source_route,
+                       check_aaa_not_configured, check_aaa_server_not_configured,
+                       check_vty_timeout, check_console_timeout,
+                       check_ospf_authentication, check_bgp_authentication,
+                       check_hsrp_authentication, check_ip_directed_broadcast,
+                       check_weak_vpn_encryption],
+        "cisco_xr":   [check_ip_source_route,
+                       check_aaa_not_configured, check_aaa_server_not_configured,
+                       check_vty_timeout, check_ospf_authentication,
+                       check_bgp_authentication, check_weak_vpn_encryption],
+        "cisco_nxos": [check_cdp_enabled,
+                       check_aaa_not_configured, check_aaa_server_not_configured,
+                       check_vty_timeout, check_ospf_authentication,
+                       check_bgp_authentication],
+        "cisco_asa":  [check_asa_asdm_enabled, check_asa_icmp_unreachable,
+                       check_asa_logging, check_asa_threat_detection],
+        "fortinet":   [check_fortinet_admin_https, check_fortinet_trusted_hosts,
+                       check_fortinet_admin_timeout, check_fortinet_logging],
+        "paloalto":   [check_paloalto_panorama, check_paloalto_syslog,
+                       check_paloalto_zone_protection, check_paloalto_url_filtering],
+        "juniper":    [check_juniper_root_login, check_juniper_ntp,
+                       check_juniper_ospf_auth, check_juniper_bgp_auth,
+                       check_juniper_login_timeout],
+        "arista":     [check_cdp_enabled,
+                       check_aaa_not_configured, check_aaa_server_not_configured,
+                       check_vty_timeout, check_bgp_authentication],
+        "huawei":     [check_huawei_telnet, check_huawei_snmp,
+                       check_huawei_snmpv3, check_huawei_aaa],
         "hp_comware": [],
-        "mikrotik":   [check_mikrotik_default_admin],
+        "mikrotik":   [check_mikrotik_default_admin,
+                       check_mikrotik_upnp, check_mikrotik_winbox],
     }
 
     checks = universal_checks + vendor_checks.get(family, [])
@@ -594,5 +617,708 @@ def check_mikrotik_default_admin(config: str, device_type: str) -> dict:
         "title": "MikroTik Default Admin Password",
         "severity": "PASS",
         "detail": "Default admin account appears to have a password set.",
+        "remediation": ""
+    }
+
+
+# ─────────────────────────────────────────────
+# New Universal Checks (CHK-025 to CHK-026)
+# ─────────────────────────────────────────────
+
+def check_syslog_configured(config: str, device_type: str) -> dict:
+    """Warn if no remote syslog/logging server is configured."""
+    from connector import VENDOR_FAMILY
+    family = VENDOR_FAMILY.get(device_type, "cisco")
+
+    # Palo Alto has its own dedicated syslog check (CHK-019) — skip to avoid duplicates
+    if family == "paloalto":
+        return None
+
+    # Vendor-specific remote syslog patterns
+    patterns = {
+        "cisco":      r"logging (?:host )?\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}",
+        "cisco_xr":   r"logging \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}",
+        "cisco_nxos": r"logging server \S+",
+        "cisco_asa":  r"logging host \S+",
+        "juniper":    r"syslog\s*\{[^}]*host\s+\S+",
+        "arista":     r"logging host \S+",
+        "huawei":     r"info-center loghost",
+        "hp_comware": r"info-center loghost",
+        "fortinet":   r"config log syslogd|set syslogd-server",
+        "mikrotik":   r'type="remote"',
+    }
+
+    pattern = patterns.get(family, r"logging (?:host )?\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")
+
+    if not re.search(pattern, config, re.IGNORECASE | re.DOTALL):
+        return {
+            "check_id": "CHK-025",
+            "title": "Syslog Server Not Configured",
+            "severity": "WARNING",
+            "detail": "No remote syslog/logging server is configured. Logs may not be forwarded to a SIEM or central log collector.",
+            "remediation": "Configure a remote syslog server to ensure logs are retained and available for incident response and forensics."
+        }
+    return {
+        "check_id": "CHK-025",
+        "title": "Syslog Server",
+        "severity": "PASS",
+        "detail": "A remote syslog/logging server appears to be configured.",
+        "remediation": ""
+    }
+
+
+def check_snmpv3_not_used(config: str, device_type: str) -> dict:
+    """Warn if SNMP is configured but SNMPv3 is not in use."""
+    from connector import VENDOR_FAMILY
+    family = VENDOR_FAMILY.get(device_type, "cisco")
+
+    # Check if SNMP is even present in the config
+    if not re.search(r"snmp", config, re.IGNORECASE):
+        return {
+            "check_id": "CHK-026",
+            "title": "SNMPv3",
+            "severity": "PASS",
+            "detail": "SNMP does not appear to be configured.",
+            "remediation": ""
+        }
+
+    # Vendor-specific SNMPv3 patterns
+    v3_patterns = {
+        "cisco":      r"snmp-server (group|user) \S+ v3",
+        "cisco_xr":   r"snmp-server (group|user) \S+ v3",
+        "cisco_nxos": r"snmp-server (group|user) \S+ v3",
+        "juniper":    r"snmpv3",
+        "huawei":     r"snmp-agent (group v3|usm-user v3)",
+        "hp_comware": r"snmp-agent group v3",
+    }
+
+    pattern = v3_patterns.get(family, r"snmp.{0,30}v3")
+
+    if not re.search(pattern, config, re.IGNORECASE):
+        return {
+            "check_id": "CHK-026",
+            "title": "SNMPv3 Not In Use",
+            "severity": "WARNING",
+            "detail": "SNMP is configured but SNMPv3 does not appear to be in use. SNMPv1/v2c transmit community strings in plaintext.",
+            "remediation": "Migrate to SNMPv3 with authPriv security level (authentication + encryption) and retire v1/v2c community strings."
+        }
+    return {
+        "check_id": "CHK-026",
+        "title": "SNMPv3",
+        "severity": "PASS",
+        "detail": "SNMPv3 appears to be configured.",
+        "remediation": ""
+    }
+
+
+# ─────────────────────────────────────────────
+# New Cisco-Family Checks (CHK-027 to CHK-035)
+# Applied to: cisco, cisco_xr, cisco_nxos, arista
+# ─────────────────────────────────────────────
+
+def check_aaa_not_configured(config: str, device_type: str) -> dict:
+    """Warn if AAA (Authentication, Authorisation, Accounting) model is not enabled."""
+    if not re.search(r"aaa new-model", config, re.IGNORECASE):
+        return {
+            "check_id": "CHK-027",
+            "title": "AAA Not Configured",
+            "severity": "WARNING",
+            "detail": "AAA (aaa new-model) is not enabled. Without AAA, centralised authentication and per-command accounting are unavailable.",
+            "remediation": "Enable AAA: aaa new-model. Then configure authentication, authorisation, and accounting policies."
+        }
+    return {
+        "check_id": "CHK-027",
+        "title": "AAA Configuration",
+        "severity": "PASS",
+        "detail": "AAA new-model is enabled.",
+        "remediation": ""
+    }
+
+
+def check_aaa_server_not_configured(config: str, device_type: str) -> dict:
+    """Warn if AAA is enabled but no TACACS+ or RADIUS server is configured."""
+    if not re.search(r"aaa new-model", config, re.IGNORECASE):
+        # AAA not enabled — already flagged by CHK-027, nothing to add here
+        return {
+            "check_id": "CHK-028",
+            "title": "TACACS+/RADIUS Server",
+            "severity": "PASS",
+            "detail": "AAA not enabled — see CHK-027.",
+            "remediation": ""
+        }
+
+    has_tacacs = re.search(r"(tacacs-server host|tacacs server)\s+\S+", config, re.IGNORECASE)
+    has_radius = re.search(r"(radius-server host|radius server)\s+\S+", config, re.IGNORECASE)
+
+    if not has_tacacs and not has_radius:
+        return {
+            "check_id": "CHK-028",
+            "title": "No TACACS+/RADIUS Server Configured",
+            "severity": "WARNING",
+            "detail": "AAA is enabled but no TACACS+ or RADIUS server is defined. Authentication falls back to local accounts only, with no centralised audit trail.",
+            "remediation": "Configure a TACACS+ server: tacacs server <name> / address ipv4 <ip> / key <key>. Or use radius-server for RADIUS."
+        }
+    return {
+        "check_id": "CHK-028",
+        "title": "TACACS+/RADIUS Server",
+        "severity": "PASS",
+        "detail": "A TACACS+ or RADIUS server is configured.",
+        "remediation": ""
+    }
+
+
+def check_vty_timeout(config: str, device_type: str) -> dict:
+    """Warn if VTY lines have no exec-timeout or timeout is disabled (0 0)."""
+    vty_blocks = re.findall(r"line vty.*?(?=line |\Z)", config, re.DOTALL | re.IGNORECASE)
+    if not vty_blocks:
+        return {
+            "check_id": "CHK-029",
+            "title": "VTY Session Timeout",
+            "severity": "PASS",
+            "detail": "No VTY lines found in configuration.",
+            "remediation": ""
+        }
+
+    has_no_timeout = any(not re.search(r"exec-timeout", b, re.IGNORECASE) for b in vty_blocks)
+    has_disabled   = any(re.search(r"exec-timeout 0 0", b, re.IGNORECASE) for b in vty_blocks)
+
+    if has_no_timeout:
+        return {
+            "check_id": "CHK-029",
+            "title": "VTY Session Timeout Not Configured",
+            "severity": "WARNING",
+            "detail": "One or more VTY line groups have no exec-timeout configured. Idle SSH/Telnet sessions remain open indefinitely and can be hijacked.",
+            "remediation": "Set a timeout under each VTY line group: exec-timeout 10 0  (10 minutes)."
+        }
+    if has_disabled:
+        return {
+            "check_id": "CHK-029",
+            "title": "VTY Session Timeout Disabled",
+            "severity": "WARNING",
+            "detail": "exec-timeout is explicitly disabled (0 0) on one or more VTY lines. Sessions never expire.",
+            "remediation": "Replace exec-timeout 0 0 with a finite value: exec-timeout 10 0."
+        }
+    return {
+        "check_id": "CHK-029",
+        "title": "VTY Session Timeout",
+        "severity": "PASS",
+        "detail": "VTY lines have exec-timeout configured.",
+        "remediation": ""
+    }
+
+
+def check_console_timeout(config: str, device_type: str) -> dict:
+    """Warn if console line has no exec-timeout or timeout is disabled."""
+    console_block = re.search(r"line con 0(.*?)(?=line |\Z)", config, re.DOTALL | re.IGNORECASE)
+    if not console_block:
+        return {
+            "check_id": "CHK-030",
+            "title": "Console Session Timeout",
+            "severity": "PASS",
+            "detail": "No console line block found.",
+            "remediation": ""
+        }
+
+    block = console_block.group(1)
+    if not re.search(r"exec-timeout", block, re.IGNORECASE):
+        return {
+            "check_id": "CHK-030",
+            "title": "Console Session Timeout Not Configured",
+            "severity": "WARNING",
+            "detail": "Console line (line con 0) has no exec-timeout. Physical console sessions may remain open indefinitely when unattended.",
+            "remediation": "Set a timeout under line con 0: exec-timeout 10 0."
+        }
+    if re.search(r"exec-timeout 0 0", block, re.IGNORECASE):
+        return {
+            "check_id": "CHK-030",
+            "title": "Console Session Timeout Disabled",
+            "severity": "WARNING",
+            "detail": "Console session timeout is explicitly disabled (exec-timeout 0 0). Physical console sessions never expire.",
+            "remediation": "Replace with a finite timeout: exec-timeout 10 0 under line con 0."
+        }
+    return {
+        "check_id": "CHK-030",
+        "title": "Console Session Timeout",
+        "severity": "PASS",
+        "detail": "Console line has exec-timeout configured.",
+        "remediation": ""
+    }
+
+
+def check_ospf_authentication(config: str, device_type: str) -> dict:
+    """Warn if OSPF is configured without authentication."""
+    if not re.search(r"router ospf", config, re.IGNORECASE):
+        return {
+            "check_id": "CHK-031",
+            "title": "OSPF Authentication",
+            "severity": "PASS",
+            "detail": "OSPF is not configured on this device.",
+            "remediation": ""
+        }
+
+    has_area_auth  = re.search(r"area \S+ authentication", config, re.IGNORECASE)
+    has_iface_auth = re.search(r"ip ospf authentication", config, re.IGNORECASE)
+
+    if not has_area_auth and not has_iface_auth:
+        return {
+            "check_id": "CHK-031",
+            "title": "OSPF Authentication Not Configured",
+            "severity": "WARNING",
+            "detail": "OSPF is configured but no authentication is set. Without authentication, any device can inject rogue LSAs and poison the routing table.",
+            "remediation": "Enable MD5 authentication: area <id> authentication message-digest. Then add ip ospf message-digest-key <id> md5 <key> on each OSPF interface."
+        }
+    return {
+        "check_id": "CHK-031",
+        "title": "OSPF Authentication",
+        "severity": "PASS",
+        "detail": "OSPF authentication appears to be configured.",
+        "remediation": ""
+    }
+
+
+def check_bgp_authentication(config: str, device_type: str) -> dict:
+    """Warn if BGP neighbors are configured without MD5 authentication."""
+    if not re.search(r"router bgp", config, re.IGNORECASE):
+        return {
+            "check_id": "CHK-032",
+            "title": "BGP Authentication",
+            "severity": "PASS",
+            "detail": "BGP is not configured on this device.",
+            "remediation": ""
+        }
+
+    neighbors = re.findall(r"neighbor \S+ remote-as", config, re.IGNORECASE)
+    if not neighbors:
+        return {
+            "check_id": "CHK-032",
+            "title": "BGP Authentication",
+            "severity": "PASS",
+            "detail": "No BGP neighbors found.",
+            "remediation": ""
+        }
+
+    if not re.search(r"neighbor \S+ password", config, re.IGNORECASE):
+        return {
+            "check_id": "CHK-032",
+            "title": "BGP MD5 Authentication Missing",
+            "severity": "WARNING",
+            "detail": f"BGP is configured with {len(neighbors)} neighbour(s) but no MD5 password is set. Unauthenticated BGP sessions are vulnerable to session hijacking and route injection.",
+            "remediation": "Add MD5 authentication for all BGP peers: neighbor <ip> password <key>."
+        }
+    return {
+        "check_id": "CHK-032",
+        "title": "BGP Authentication",
+        "severity": "PASS",
+        "detail": "BGP neighbour authentication appears to be configured.",
+        "remediation": ""
+    }
+
+
+def check_hsrp_authentication(config: str, device_type: str) -> dict:
+    """Warn if HSRP or VRRP is configured without authentication."""
+    has_hsrp = re.search(r"standby \d+ ip", config, re.IGNORECASE)
+    has_vrrp = re.search(r"vrrp \d+ ip", config, re.IGNORECASE)
+
+    if not has_hsrp and not has_vrrp:
+        return {
+            "check_id": "CHK-033",
+            "title": "HSRP/VRRP Authentication",
+            "severity": "PASS",
+            "detail": "HSRP and VRRP do not appear to be configured.",
+            "remediation": ""
+        }
+
+    has_hsrp_auth = re.search(r"standby \d+ authentication", config, re.IGNORECASE)
+    has_vrrp_auth = re.search(r"vrrp \d+ authentication", config, re.IGNORECASE)
+
+    protocol = "HSRP" if has_hsrp else "VRRP"
+    if has_hsrp and has_vrrp:
+        protocol = "HSRP/VRRP"
+
+    if (has_hsrp and not has_hsrp_auth) or (has_vrrp and not has_vrrp_auth):
+        return {
+            "check_id": "CHK-033",
+            "title": f"{protocol} Authentication Missing",
+            "severity": "WARNING",
+            "detail": f"{protocol} is configured without authentication. An attacker on the same segment can send crafted {protocol} packets to become the active gateway and intercept traffic.",
+            "remediation": "Enable MD5 authentication: standby <group> authentication md5 key-string <key>"
+        }
+    return {
+        "check_id": "CHK-033",
+        "title": "HSRP/VRRP Authentication",
+        "severity": "PASS",
+        "detail": f"{protocol} authentication is configured.",
+        "remediation": ""
+    }
+
+
+def check_ip_directed_broadcast(config: str, device_type: str) -> dict:
+    """Fail if ip directed-broadcast is explicitly enabled on any interface."""
+    # Directed broadcast is disabled by default in IOS 12.0+.
+    # Flag only if it's explicitly turned on (without 'no' prefix).
+    if re.search(r"^\s*ip directed-broadcast\b", config, re.IGNORECASE | re.MULTILINE):
+        return {
+            "check_id": "CHK-034",
+            "title": "IP Directed Broadcast Enabled",
+            "severity": "FAIL",
+            "detail": "IP directed broadcast is explicitly enabled on one or more interfaces. This can be abused to amplify DDoS attacks (Smurf attack).",
+            "remediation": "Disable on all interfaces: no ip directed-broadcast"
+        }
+    return {
+        "check_id": "CHK-034",
+        "title": "IP Directed Broadcast",
+        "severity": "PASS",
+        "detail": "IP directed broadcast does not appear to be enabled.",
+        "remediation": ""
+    }
+
+
+def check_weak_vpn_encryption(config: str, device_type: str) -> dict:
+    """Warn if DES or 3DES encryption is used in IPSec/IKE/VPN configurations."""
+    # ISAKMP / IKEv1 policy weak encryption
+    isakmp_weak = re.search(r"^\s*encryption (des|3des)\b", config, re.IGNORECASE | re.MULTILINE)
+    # IPSec transform set weak cipher
+    ipsec_weak  = re.search(r"\besp-(des|3des)\b", config, re.IGNORECASE)
+
+    if isakmp_weak or ipsec_weak:
+        weak_algos = set()
+        if isakmp_weak:
+            weak_algos.add(isakmp_weak.group(1).upper())
+        if ipsec_weak:
+            weak_algos.add(ipsec_weak.group(1).upper())
+        return {
+            "check_id": "CHK-035",
+            "title": "Weak VPN Encryption Algorithm",
+            "severity": "WARNING",
+            "detail": f"Weak encryption algorithm(s) detected in VPN/IPSec configuration: {', '.join(sorted(weak_algos))}. DES is cryptographically broken; 3DES is deprecated.",
+            "remediation": "Replace with AES-256 in ISAKMP policies and AES-256 transform sets. Update IKE proposals to use SHA-256 or higher for hashing."
+        }
+    return {
+        "check_id": "CHK-035",
+        "title": "VPN Encryption Strength",
+        "severity": "PASS",
+        "detail": "No weak VPN encryption algorithms (DES/3DES) detected.",
+        "remediation": ""
+    }
+
+
+# ─────────────────────────────────────────────
+# New Cisco ASA Checks (CHK-036 to CHK-037)
+# ─────────────────────────────────────────────
+
+def check_asa_logging(config: str, device_type: str) -> dict:
+    """Warn if logging is not enabled on the ASA."""
+    if not re.search(r"logging enable", config, re.IGNORECASE):
+        return {
+            "check_id": "CHK-036",
+            "title": "ASA Logging Not Enabled",
+            "severity": "WARNING",
+            "detail": "Logging is not enabled on the ASA. Firewall events (connection drops, ACL hits, AAA events) will not be captured or forwarded.",
+            "remediation": "Enable logging: logging enable. Then configure a destination: logging host <interface> <syslog-server-ip>."
+        }
+    return {
+        "check_id": "CHK-036",
+        "title": "ASA Logging",
+        "severity": "PASS",
+        "detail": "Logging is enabled on the ASA.",
+        "remediation": ""
+    }
+
+
+def check_asa_threat_detection(config: str, device_type: str) -> dict:
+    """Warn if basic threat detection is not configured on the ASA."""
+    if not re.search(r"threat-detection basic-threat", config, re.IGNORECASE):
+        return {
+            "check_id": "CHK-037",
+            "title": "ASA Threat Detection Not Configured",
+            "severity": "WARNING",
+            "detail": "Basic threat detection is not enabled. The ASA will not automatically track hosts performing port scans or DoS attacks.",
+            "remediation": "Enable threat detection: threat-detection basic-threat. Optionally add: threat-detection statistics for detailed host tracking."
+        }
+    return {
+        "check_id": "CHK-037",
+        "title": "ASA Threat Detection",
+        "severity": "PASS",
+        "detail": "Basic threat detection is configured.",
+        "remediation": ""
+    }
+
+
+# ─────────────────────────────────────────────
+# New Fortinet Checks (CHK-038 to CHK-039)
+# ─────────────────────────────────────────────
+
+def check_fortinet_admin_timeout(config: str, device_type: str) -> dict:
+    """Warn if FortiGate admin session timeout is missing or excessively long."""
+    timeout_match = re.search(r"set admintimeout (\d+)", config, re.IGNORECASE)
+    if not timeout_match:
+        return {
+            "check_id": "CHK-038",
+            "title": "FortiGate Admin Session Timeout Not Set",
+            "severity": "WARNING",
+            "detail": "Admin session timeout (admintimeout) is not configured. Idle admin sessions may remain active indefinitely.",
+            "remediation": "Set a timeout under config system global: set admintimeout 10  (10 minutes recommended)."
+        }
+    timeout_val = int(timeout_match.group(1))
+    if timeout_val > 30:
+        return {
+            "check_id": "CHK-038",
+            "title": "FortiGate Admin Session Timeout Too Long",
+            "severity": "WARNING",
+            "detail": f"Admin session timeout is set to {timeout_val} minutes. Values above 30 minutes leave unattended sessions exposed.",
+            "remediation": "Reduce admintimeout to 10–15 minutes under config system global."
+        }
+    return {
+        "check_id": "CHK-038",
+        "title": "FortiGate Admin Session Timeout",
+        "severity": "PASS",
+        "detail": f"Admin session timeout is set to {timeout_val} minutes.",
+        "remediation": ""
+    }
+
+
+def check_fortinet_logging(config: str, device_type: str) -> dict:
+    """Warn if FortiGate is not sending logs to FortiAnalyzer or a syslog server."""
+    has_fortianalyzer = re.search(r"config log fortianalyzer", config, re.IGNORECASE)
+    has_syslog        = re.search(r"config log syslogd", config, re.IGNORECASE)
+
+    if not has_fortianalyzer and not has_syslog:
+        return {
+            "check_id": "CHK-039",
+            "title": "FortiGate Remote Logging Not Configured",
+            "severity": "WARNING",
+            "detail": "No FortiAnalyzer or syslog logging destination is configured. Firewall logs are stored locally only and are at risk of loss or tampering.",
+            "remediation": "Configure remote logging: config log fortianalyzer (or syslogd), set status enable, set server <ip>."
+        }
+    return {
+        "check_id": "CHK-039",
+        "title": "FortiGate Remote Logging",
+        "severity": "PASS",
+        "detail": "Remote logging (FortiAnalyzer or syslog) appears to be configured.",
+        "remediation": ""
+    }
+
+
+# ─────────────────────────────────────────────
+# New Palo Alto Checks (CHK-040 to CHK-041)
+# ─────────────────────────────────────────────
+
+def check_paloalto_zone_protection(config: str, device_type: str) -> dict:
+    """Warn if no zone protection profile is configured on Palo Alto."""
+    if not re.search(r"zone-protection-profile", config, re.IGNORECASE):
+        return {
+            "check_id": "CHK-040",
+            "title": "Zone Protection Profile Missing",
+            "severity": "WARNING",
+            "detail": "No zone protection profiles are configured. Zone protection defends against flood attacks (SYN, UDP, ICMP), port scans, and packet-based attacks at the zone level.",
+            "remediation": "Create zone protection profiles under Network > Zone Protection and apply them to all zones, especially the untrust zone."
+        }
+    return {
+        "check_id": "CHK-040",
+        "title": "Zone Protection Profiles",
+        "severity": "PASS",
+        "detail": "Zone protection profile(s) are configured.",
+        "remediation": ""
+    }
+
+
+def check_paloalto_url_filtering(config: str, device_type: str) -> dict:
+    """Warn if no URL filtering profile is configured on Palo Alto."""
+    if not re.search(r"url-filtering", config, re.IGNORECASE):
+        return {
+            "check_id": "CHK-041",
+            "title": "URL Filtering Profile Missing",
+            "severity": "WARNING",
+            "detail": "No URL filtering profile is configured. Users may reach malicious, phishing, or policy-prohibited websites.",
+            "remediation": "Create a URL filtering profile under Objects > Security Profiles > URL Filtering and attach it to outbound security policies."
+        }
+    return {
+        "check_id": "CHK-041",
+        "title": "URL Filtering",
+        "severity": "PASS",
+        "detail": "URL filtering profile is configured.",
+        "remediation": ""
+    }
+
+
+# ─────────────────────────────────────────────
+# New Juniper Checks (CHK-042 to CHK-044)
+# ─────────────────────────────────────────────
+
+def check_juniper_ospf_auth(config: str, device_type: str) -> dict:
+    """Warn if OSPF is configured on Juniper without authentication."""
+    if not re.search(r"protocols\s+ospf", config, re.IGNORECASE):
+        return {
+            "check_id": "CHK-042",
+            "title": "Juniper OSPF Authentication",
+            "severity": "PASS",
+            "detail": "OSPF is not configured on this device.",
+            "remediation": ""
+        }
+
+    if not re.search(r"authentication\s+(md5|simple)", config, re.IGNORECASE):
+        return {
+            "check_id": "CHK-042",
+            "title": "Juniper OSPF Authentication Missing",
+            "severity": "WARNING",
+            "detail": "OSPF is configured but no authentication is set. Rogue devices can inject LSAs and corrupt the routing table.",
+            "remediation": "Enable MD5 authentication per interface: set protocols ospf area <id> interface <if> authentication md5 <key-id> key <key>."
+        }
+    return {
+        "check_id": "CHK-042",
+        "title": "Juniper OSPF Authentication",
+        "severity": "PASS",
+        "detail": "OSPF authentication is configured.",
+        "remediation": ""
+    }
+
+
+def check_juniper_bgp_auth(config: str, device_type: str) -> dict:
+    """Warn if BGP is configured on Juniper without authentication keys."""
+    if not re.search(r"protocols\s+bgp", config, re.IGNORECASE):
+        return {
+            "check_id": "CHK-043",
+            "title": "Juniper BGP Authentication",
+            "severity": "PASS",
+            "detail": "BGP is not configured on this device.",
+            "remediation": ""
+        }
+
+    if not re.search(r"authentication-key", config, re.IGNORECASE):
+        return {
+            "check_id": "CHK-043",
+            "title": "Juniper BGP Authentication Missing",
+            "severity": "WARNING",
+            "detail": "BGP is configured but no authentication keys are set. Unauthenticated BGP sessions can be hijacked or used for route injection.",
+            "remediation": "Set per-neighbour authentication keys: set protocols bgp group <group> neighbor <ip> authentication-key <key>."
+        }
+    return {
+        "check_id": "CHK-043",
+        "title": "Juniper BGP Authentication",
+        "severity": "PASS",
+        "detail": "BGP authentication key(s) are configured.",
+        "remediation": ""
+    }
+
+
+def check_juniper_login_timeout(config: str, device_type: str) -> dict:
+    """Warn if no idle-timeout is configured for Juniper login classes."""
+    if not re.search(r"idle-timeout", config, re.IGNORECASE):
+        return {
+            "check_id": "CHK-044",
+            "title": "Juniper Session Idle Timeout Not Set",
+            "severity": "WARNING",
+            "detail": "No idle-timeout is configured on any login class. Interactive SSH and console sessions may remain open indefinitely when unattended.",
+            "remediation": "Set an idle timeout on all login classes: set system login class <class> idle-timeout <minutes>."
+        }
+    return {
+        "check_id": "CHK-044",
+        "title": "Juniper Session Idle Timeout",
+        "severity": "PASS",
+        "detail": "Session idle timeout is configured on login class(es).",
+        "remediation": ""
+    }
+
+
+# ─────────────────────────────────────────────
+# New Huawei Checks (CHK-045 to CHK-046)
+# ─────────────────────────────────────────────
+
+def check_huawei_snmpv3(config: str, device_type: str) -> dict:
+    """Warn if SNMP is configured on Huawei device but SNMPv3 is not in use."""
+    if not re.search(r"snmp-agent", config, re.IGNORECASE):
+        return {
+            "check_id": "CHK-045",
+            "title": "Huawei SNMPv3",
+            "severity": "PASS",
+            "detail": "SNMP does not appear to be configured.",
+            "remediation": ""
+        }
+
+    if not re.search(r"snmp-agent (group v3|usm-user v3)", config, re.IGNORECASE):
+        return {
+            "check_id": "CHK-045",
+            "title": "Huawei SNMPv3 Not Configured",
+            "severity": "WARNING",
+            "detail": "SNMP is configured but SNMPv3 is not in use. SNMPv1/v2c transmit community strings in plaintext and offer no encryption.",
+            "remediation": "Configure SNMPv3: snmp-agent group v3 <group> privacy and create a USM user with authentication and privacy settings."
+        }
+    return {
+        "check_id": "CHK-045",
+        "title": "Huawei SNMPv3",
+        "severity": "PASS",
+        "detail": "SNMPv3 is configured.",
+        "remediation": ""
+    }
+
+
+def check_huawei_aaa(config: str, device_type: str) -> dict:
+    """Warn if AAA is not configured on Huawei device."""
+    if not re.search(r"^aaa\s*$", config, re.IGNORECASE | re.MULTILINE):
+        return {
+            "check_id": "CHK-046",
+            "title": "Huawei AAA Not Configured",
+            "severity": "WARNING",
+            "detail": "AAA configuration block not found. Centralised authentication (RADIUS/TACACS+) and accounting may not be in place.",
+            "remediation": "Configure AAA with authentication and accounting schemes, and link to a RADIUS or HWTACACS server group."
+        }
+    return {
+        "check_id": "CHK-046",
+        "title": "Huawei AAA",
+        "severity": "PASS",
+        "detail": "AAA configuration is present.",
+        "remediation": ""
+    }
+
+
+# ─────────────────────────────────────────────
+# New MikroTik Checks (CHK-047 to CHK-048)
+# ─────────────────────────────────────────────
+
+def check_mikrotik_upnp(config: str, device_type: str) -> dict:
+    """Warn if UPnP is enabled on MikroTik."""
+    if re.search(r'enabled=yes', config, re.IGNORECASE) and \
+       re.search(r'/ip upnp', config, re.IGNORECASE):
+        return {
+            "check_id": "CHK-047",
+            "title": "MikroTik UPnP Enabled",
+            "severity": "WARNING",
+            "detail": "UPnP (Universal Plug and Play) is enabled. UPnP allows LAN devices to automatically open firewall ports without authentication, which is commonly abused by malware.",
+            "remediation": "Disable UPnP: /ip upnp set enabled=no"
+        }
+    return {
+        "check_id": "CHK-047",
+        "title": "MikroTik UPnP",
+        "severity": "PASS",
+        "detail": "UPnP does not appear to be enabled.",
+        "remediation": ""
+    }
+
+
+def check_mikrotik_winbox(config: str, device_type: str) -> dict:
+    """Warn if Winbox management is accessible from any IP address."""
+    if not re.search(r"winbox", config, re.IGNORECASE):
+        return {
+            "check_id": "CHK-048",
+            "title": "MikroTik Winbox Access",
+            "severity": "PASS",
+            "detail": "Winbox service does not appear to be configured.",
+            "remediation": ""
+        }
+
+    # Flag if address restriction is missing or set to 0.0.0.0/0 (any)
+    if re.search(r'winbox.*address=0\.0\.0\.0/0|winbox.*address=""', config, re.IGNORECASE):
+        return {
+            "check_id": "CHK-048",
+            "title": "Winbox Accessible From Any Address",
+            "severity": "WARNING",
+            "detail": "Winbox management (TCP/8291) is accessible from any IP. Winbox has a history of critical vulnerabilities (e.g. CVE-2018-14847).",
+            "remediation": "Restrict Winbox to management hosts: /ip service set winbox address=<mgmt-subnet>/24"
+        }
+    return {
+        "check_id": "CHK-048",
+        "title": "MikroTik Winbox Access",
+        "severity": "PASS",
+        "detail": "Winbox access appears to be restricted to specific addresses.",
         "remediation": ""
     }
