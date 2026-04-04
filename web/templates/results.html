@@ -102,11 +102,17 @@
   {% endfor %}
 </div>
 
+{% if custom_check_count %}
+<div style="background:var(--surface2);border:1px solid var(--accent);border-radius:6px;padding:0.6rem 1rem;margin-bottom:1rem;font-size:0.82rem;color:var(--accent)">
+  ✦ {{ custom_check_count }} custom check{{ 's' if custom_check_count != 1 }} loaded from your YAML file — results marked <strong>CUSTOM</strong> below.
+</div>
+{% endif %}
+
 {% if r.fails %}
 <div class="section-title">⚠ Critical Findings — {{ r.fails | length }} item{{ 's' if r.fails | length != 1 }}</div>
 {% for f in r.fails %}
 <div class="finding fail">
-  <div class="finding-header"><span class="finding-id">{{ f.check_id }}</span><span class="severity-badge badge-fail">FAIL</span><span class="finding-title">{{ f.title }}</span></div>
+  <div class="finding-header"><span class="finding-id">{{ f.check_id }}</span><span class="severity-badge badge-fail">FAIL</span>{% if f.get('custom') %}<span class="severity-badge" style="background:#6c3bbf;color:#e0d0ff;font-size:0.65rem;padding:2px 6px;border-radius:4px;margin-left:2px">CUSTOM</span>{% endif %}<span class="finding-title">{{ f.title }}</span></div>
   <div class="finding-detail">{{ f.detail }}</div>
   {% if f.remediation %}<div class="finding-remediation">→ {{ f.remediation }}</div>{% endif %}
 </div>
@@ -117,7 +123,7 @@
 <div class="section-title">△ Warnings — {{ r.warnings | length }} item{{ 's' if r.warnings | length != 1 }}</div>
 {% for f in r.warnings %}
 <div class="finding warning">
-  <div class="finding-header"><span class="finding-id">{{ f.check_id }}</span><span class="severity-badge badge-warning">WARNING</span><span class="finding-title">{{ f.title }}</span></div>
+  <div class="finding-header"><span class="finding-id">{{ f.check_id }}</span><span class="severity-badge badge-warning">WARNING</span>{% if f.get('custom') %}<span class="severity-badge" style="background:#6c3bbf;color:#e0d0ff;font-size:0.65rem;padding:2px 6px;border-radius:4px;margin-left:2px">CUSTOM</span>{% endif %}<span class="finding-title">{{ f.title }}</span></div>
   <div class="finding-detail">{{ f.detail }}</div>
   {% if f.remediation %}<div class="finding-remediation">→ {{ f.remediation }}</div>{% endif %}
 </div>
@@ -128,7 +134,7 @@
 <div class="section-title">✓ Passed — {{ r.passes | length }} item{{ 's' if r.passes | length != 1 }}</div>
 {% for f in r.passes %}
 <div class="finding pass">
-  <div class="finding-header"><span class="finding-id">{{ f.check_id }}</span><span class="severity-badge badge-pass">PASS</span><span class="finding-title">{{ f.title }}</span></div>
+  <div class="finding-header"><span class="finding-id">{{ f.check_id }}</span><span class="severity-badge badge-pass">PASS</span>{% if f.get('custom') %}<span class="severity-badge" style="background:#6c3bbf;color:#e0d0ff;font-size:0.65rem;padding:2px 6px;border-radius:4px;margin-left:2px">CUSTOM</span>{% endif %}<span class="finding-title">{{ f.title }}</span></div>
   <div class="finding-detail">{{ f.detail }}</div>
 </div>
 {% endfor %}

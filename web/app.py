@@ -81,10 +81,12 @@ async def run_audit(
     request: Request,
     config_file: UploadFile = File(...),
     device_type: str = Form(...),
-    device_name: str = Form("")
+    device_name: str = Form(""),
+    custom_checks_file: UploadFile = File(None),
 ):
     """
-    Accept a config file upload, run audit, return results page.
+    Accept a config file upload (and optional custom checks YAML),
+    run audit, return results page.
     """
     if not config_file.filename:
         raise HTTPException(status_code=400, detail="No file uploaded.")
@@ -102,7 +104,22 @@ async def run_audit(
     timestamp    = datetime.now().isoformat()
     display_name = device_name.strip() or Path(config_file.filename).stem
 
-    findings   = run_all_checks(raw_config, device_type)
+    findings = run_all_checks(raw_config, device_type)
+
+    # Run custom checks if a YAML file was uploaded
+    custom_check_count = 0
+    if custom_checks_file and custom_checks_file.filename:
+        try:
+            from custom_checks import load_custom_checks_from_string, run_custom_checks
+            yaml_content = (await custom_checks_file.read()).decode("utf-8", errors="replace")
+            custom_defs  = load_custom_checks_from_string(yaml_content)
+            if custom_defs:
+                extra = run_custom_checks(raw_config, device_type, custom_defs)
+                findings.extend(extra)
+                custom_check_count = len(custom_defs)
+        except Exception:
+            pass  # Custom checks are optional — silently skip on any error
+
     score_data = calculate_score(findings)
 
     result = {
@@ -130,19 +147,20 @@ async def run_audit(
     generate_remediation_script(result, device_type, str(rem_path))
 
     context = {
-        "request":      request,
-        "results":      [result],
-        "device_type":  device_type,
-        "timestamp":    timestamp[:19].replace("T", " "),
-        "pdf_url":      f"/download/{pdf_filename}",
-        "rem_files":    [{"name": display_name, "url": f"/download/{rem_filename}"}],
-        "total_fails":    len(result["fails"]),
-        "total_warnings": len(result["warnings"]),
-        "total_passes":   len(result["passes"]),
-        "worst_score":    score_data["score"],
-        "worst_level":    score_data["risk_level"],
-        "multi":          False,
-        "device_types":   SUPPORTED_DEVICE_TYPES,
+        "request":           request,
+        "results":           [result],
+        "device_type":       device_type,
+        "timestamp":         timestamp[:19].replace("T", " "),
+        "pdf_url":           f"/download/{pdf_filename}",
+        "rem_files":         [{"name": display_name, "url": f"/download/{rem_filename}"}],
+        "total_fails":       len(result["fails"]),
+        "total_warnings":    len(result["warnings"]),
+        "total_passes":      len(result["passes"]),
+        "worst_score":       score_data["score"],
+        "worst_level":       score_data["risk_level"],
+        "multi":             False,
+        "device_types":      SUPPORTED_DEVICE_TYPES,
+        "custom_check_count": custom_check_count,
     }
     return templates.TemplateResponse(request=request, name="results.html", context=context)
 

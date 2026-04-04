@@ -396,6 +396,23 @@
         <input type="text" name="device_name" placeholder="e.g. Core-Router-01">
       </div>
 
+      <div class="field">
+        <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;user-select:none">
+          <span>Custom Checks</span>
+          <span style="opacity:0.5;font-size:0.8rem">(optional — upload a .yaml rule file)</span>
+          <span id="customToggle" style="margin-left:auto;font-size:0.75rem;color:var(--accent);cursor:pointer" onclick="toggleCustomChecks()">+ Add</span>
+        </label>
+        <div id="customChecksSection" style="display:none;margin-top:0.5rem">
+          <div class="dropzone" id="yamlDropzone" style="padding:0.75rem 1rem;min-height:unset">
+            <input type="file" name="custom_checks_file" id="yamlInput" accept=".yaml,.yml">
+            <span class="dropzone-icon" style="font-size:1.2rem">📋</span>
+            <div class="dropzone-text" style="font-size:0.85rem"><strong>Click to upload</strong> your custom checks YAML</div>
+            <div class="dropzone-sub" style="font-size:0.75rem">See <code>custom_checks.example.yaml</code> in the repo for the schema</div>
+            <div class="file-selected" id="yamlSelected" style="font-size:0.8rem"></div>
+          </div>
+        </div>
+      </div>
+
       <button type="submit" class="btn-submit" id="submitBtn">
         Run Security Audit →
       </button>
@@ -465,6 +482,28 @@
     submitBtn.classList.add('loading');
     submitBtn.textContent = 'Analysing...';
   });
+
+  // Custom checks YAML upload toggle + label
+  const yamlInput    = document.getElementById('yamlInput');
+  const yamlSelected = document.getElementById('yamlSelected');
+
+  function toggleCustomChecks() {
+    const section = document.getElementById('customChecksSection');
+    const toggle  = document.getElementById('customToggle');
+    const visible = section.style.display !== 'none';
+    section.style.display = visible ? 'none' : 'block';
+    toggle.textContent    = visible ? '+ Add' : '− Remove';
+  }
+
+  if (yamlInput) {
+    yamlInput.addEventListener('change', () => {
+      if (yamlInput.files.length > 0) {
+        yamlSelected.style.display = 'block';
+        yamlSelected.textContent   = '✓ ' + yamlInput.files[0].name;
+        document.getElementById('yamlDropzone').style.borderColor = 'var(--accent)';
+      }
+    });
+  }
 </script>
 
 </body>

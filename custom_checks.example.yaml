@@ -1,0 +1,149 @@
+# custom_checks.example.yaml
+# ---------------------------
+# ConfigSentry — Custom Check Rules
+#
+# Copy this file, rename it (e.g. my_checks.yaml), and edit to define
+# your own organisation-specific audit rules.
+#
+# CLI usage:
+#   python auditor.py --config-file mydevice.txt --device-type cisco_ios \
+#                     --custom-checks my_checks.yaml
+#
+# Web usage:
+#   Upload this file alongside your config on the web dashboard.
+#
+# ─────────────────────────────────────────────────────────────────────
+# SCHEMA REFERENCE
+# ─────────────────────────────────────────────────────────────────────
+#
+#   check_id:      Unique ID. Use CHK-CXXX prefix to avoid collisions
+#                  with built-in checks (CHK-001 to CHK-048).
+#
+#   title:         Human-readable name shown in the report.
+#
+#   pattern:       Python regex searched against the full config text.
+#                  Case-insensitive. Supports multiline (^ and $).
+#
+#   match:         "present"  — FAIL/WARN if the pattern IS found
+#                  "absent"   — FAIL/WARN if the pattern is NOT found
+#                  Defaults to "present" if omitted.
+#
+#   severity:      FAIL  — red, deducts full weight from score
+#                  WARNING — amber, deducts half weight from score
+#
+#   detail:        Message shown when the check triggers (fails).
+#
+#   detail_pass:   (optional) Message shown when the check passes.
+#
+#   remediation:   Steps to resolve the issue.
+#
+#   device_types:  (optional) List of device type strings to restrict
+#                  this check to. Omit to run on all device types.
+#                  Supported values: cisco_ios, cisco_ios_xe, cisco_xr,
+#                  cisco_nxos, cisco_asa, fortinet, paloalto_panos,
+#                  juniper_junos, arista_eos, huawei, huawei_vrp,
+#                  hp_comware, hp_procurve, dell_os10, dell_powerconnect,
+#                  mikrotik_routeros, ubiquiti_edge
+#
+# ─────────────────────────────────────────────────────────────────────
+
+checks:
+
+  # ── Example 1 ────────────────────────────────────────────────────────
+  # Flag any unencrypted GRE tunnel interfaces.
+  # GRE tunnels carry traffic in plaintext unless paired with IPSec.
+  - check_id: CHK-C001
+    title: Unencrypted GRE Tunnel Interface Present
+    pattern: "^interface Tunnel"
+    match: present
+    severity: WARNING
+    detail: >
+      GRE tunnel interface(s) found. Unencrypted GRE tunnels expose
+      traffic in transit — they provide no confidentiality or integrity.
+    remediation: >
+      Verify all tunnel interfaces are protected by an IPSec profile
+      (tunnel protection ipsec profile <name>). Remove unused tunnels.
+    device_types:
+      - cisco_ios
+      - cisco_ios_xe
+      - cisco_xr
+
+  # ── Example 2 ────────────────────────────────────────────────────────
+  # Enforce a specific corporate NTP server is configured.
+  # Change 10.10.10.1 to your organisation's NTP server IP.
+  - check_id: CHK-C002
+    title: Corporate NTP Server Not Configured
+    pattern: "ntp server 10\\.10\\.10\\.1"
+    match: absent
+    severity: WARNING
+    detail: >
+      The corporate NTP server (10.10.10.1) is not configured.
+      Devices not syncing to a trusted internal time source may have
+      unreliable log timestamps.
+    detail_pass: Corporate NTP server (10.10.10.1) is configured.
+    remediation: "Add: ntp server 10.10.10.1"
+    device_types:
+      - cisco_ios
+      - cisco_ios_xe
+      - arista_eos
+      - cisco_nxos
+
+  # ── Example 3 ────────────────────────────────────────────────────────
+  # Flag MD5 hashing in IKE/ISAKMP policies — MD5 is cryptographically weak.
+  - check_id: CHK-C003
+    title: MD5 Hashing Used in IKE Policy
+    pattern: "^\\s*hash md5"
+    match: present
+    severity: WARNING
+    detail: >
+      MD5 hashing detected in an IKE/ISAKMP policy. MD5 is
+      cryptographically broken and should not be used for VPN integrity.
+    remediation: >
+      Replace 'hash md5' with 'hash sha256' (or sha384/sha512) in all
+      crypto isakmp policy blocks.
+
+  # ── Example 4 ────────────────────────────────────────────────────────
+  # Require domain name to be set (needed for SSH key generation).
+  - check_id: CHK-C004
+    title: IP Domain Name Not Configured
+    pattern: "ip domain[- ]name\\s+\\S+"
+    match: absent
+    severity: WARNING
+    detail: >
+      No IP domain name is configured. A domain name is required to
+      generate RSA keys for SSH (crypto key generate rsa).
+    remediation: "Configure: ip domain-name <your-domain.com>"
+    device_types:
+      - cisco_ios
+      - cisco_ios_xe
+      - cisco_xr
+
+  # ── Example 5 ────────────────────────────────────────────────────────
+  # Flag the use of 'debug all' left enabled — can cause high CPU.
+  - check_id: CHK-C005
+    title: Debug All Left Enabled
+    pattern: "^debug all"
+    match: present
+    severity: FAIL
+    detail: >
+      'debug all' appears to be enabled. This generates massive output,
+      can overwhelm the console, and causes high CPU on production devices.
+    remediation: "Disable all debugs immediately: undebug all (or no debug all)"
+
+  # ── Example 6 ────────────────────────────────────────────────────────
+  # Require logging to be synchronous on console/VTY to avoid garbled output.
+  - check_id: CHK-C006
+    title: Synchronous Logging Not Configured on VTY Lines
+    pattern: "logging synchronous"
+    match: absent
+    severity: WARNING
+    detail: >
+      Synchronous logging is not configured. Without it, syslog messages
+      can interrupt CLI input, making troubleshooting difficult.
+    remediation: >
+      Add 'logging synchronous' under line con 0 and each line vty block.
+    device_types:
+      - cisco_ios
+      - cisco_ios_xe
+      - cisco_xr
+      - cisco_nxos

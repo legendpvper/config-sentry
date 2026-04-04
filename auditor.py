@@ -124,6 +124,12 @@ Examples:
         help="List all active ConfigSentry scheduled tasks"
     )
     parser.add_argument(
+        "--custom-checks",
+        default=None,
+        metavar="YAML_FILE",
+        help="Path to a YAML file containing custom check rules (see custom_checks.example.yaml)"
+    )
+    parser.add_argument(
         "--remediation",
         action="store_true",
         help="Generate a CLI remediation script alongside the report"
@@ -155,7 +161,7 @@ def load_inventory(path: str) -> list[dict]:
     return devices
 
 
-def audit_device_live(device: dict) -> dict:
+def audit_device_live(device: dict, custom_check_defs: list = None) -> dict:
     """Connect to a device via SSH, pull config, run checks, return results."""
     host = device.get("host")
     print(f"\n[*] Connecting to {host} ...")
@@ -173,8 +179,16 @@ def audit_device_live(device: dict) -> dict:
             "timestamp": datetime.now().isoformat()
         }
 
+    device_type = device.get("device_type", "cisco_ios")
     print(f"[+] Connected. Running audit checks on {host} ...")
-    findings = run_all_checks(raw_config, device.get("device_type", "cisco_ios"))
+    findings = run_all_checks(raw_config, device_type)
+
+    if custom_check_defs:
+        from custom_checks import run_custom_checks
+        custom_findings = run_custom_checks(raw_config, device_type, custom_check_defs)
+        findings.extend(custom_findings)
+        print(f"    + {len(custom_findings)} custom check(s) applied.")
+
     connection.disconnect()
 
     passed   = sum(1 for f in findings if f["severity"] == "PASS")
@@ -197,14 +211,16 @@ def audit_device_live(device: dict) -> dict:
     }
 
 
-def audit_device_offline(config_path: str, device_type: str, device_name: str = None) -> dict:
+def audit_device_offline(config_path: str, device_type: str, device_name: str = None,
+                         custom_check_defs: list = None) -> dict:
     """
     Audit a saved config file without SSH.
 
     Args:
-        config_path:  Path to the config file
-        device_type:  Netmiko device type string
-        device_name:  Optional display name for the report
+        config_path:       Path to the config file
+        device_type:       Netmiko device type string
+        device_name:       Optional display name for the report
+        custom_check_defs: Optional list of custom check dicts from load_custom_checks()
 
     Returns:
         Result dict compatible with generate_report()
@@ -230,6 +246,12 @@ def audit_device_offline(config_path: str, device_type: str, device_name: str = 
 
     print(f"[+] Loaded {len(raw_config.splitlines())} lines. Running audit checks ...")
     findings = run_all_checks(raw_config, device_type)
+
+    if custom_check_defs:
+        from custom_checks import run_custom_checks
+        custom_findings = run_custom_checks(raw_config, device_type, custom_check_defs)
+        findings.extend(custom_findings)
+        print(f"    + {len(custom_findings)} custom check(s) applied.")
 
     passed   = sum(1 for f in findings if f["severity"] == "PASS")
     warnings = sum(1 for f in findings if f["severity"] == "WARNING")
@@ -287,19 +309,26 @@ def main():
             sys.exit(1)
         print("\n[*] Running audit now as well ...\n")
 
+    # ── Load custom checks if provided ───────────────────────────
+    custom_check_defs = None
+    if args.custom_checks:
+        from custom_checks import load_custom_checks
+        custom_check_defs = load_custom_checks(args.custom_checks)
+
     # ── Offline mode ──────────────────────────────────────────────
     if args.config_file:
         results = [audit_device_offline(
             config_path=args.config_file,
             device_type=args.device_type,
-            device_name=args.device_name
+            device_name=args.device_name,
+            custom_check_defs=custom_check_defs
         )]
         device_types = [args.device_type]
 
     # ── Live SSH mode (inventory file) ────────────────────────────
     elif args.devices:
         devices = load_inventory(args.devices)
-        results = [audit_device_live(d) for d in devices]
+        results = [audit_device_live(d, custom_check_defs=custom_check_defs) for d in devices]
         device_types = [d.get("device_type", "cisco_ios") for d in devices]
 
     # ── Live SSH mode (single host) ───────────────────────────────
@@ -315,7 +344,7 @@ def main():
             "username": args.username,
             "password": password,
             "device_type": args.device_type
-        })]
+        }, custom_check_defs=custom_check_defs)]
         device_types = [args.device_type]
 
     # ── Generate report ───────────────────────────────────────────
