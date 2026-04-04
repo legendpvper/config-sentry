@@ -813,8 +813,8 @@
     }
   }
 
-  // Open diff tab if URL hash says so
-  if (window.location.hash === '#diff') switchTab('diff');
+  // Open diff tab if navigated here with ?tab=diff (e.g. from the diff results page)
+  if (new URLSearchParams(window.location.search).get('tab') === 'diff') switchTab('diff');
 </script>
 
 </body>
