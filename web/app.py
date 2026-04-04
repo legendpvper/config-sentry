@@ -10,6 +10,7 @@ import sys
 import os
 import tempfile
 import uuid
+import difflib
 from pathlib import Path
 from datetime import datetime
 from typing import List
@@ -212,6 +213,129 @@ async def download_file(filename: str):
         filename=safe_name,
         media_type=media_type
     )
+
+
+@app.post("/diff", response_class=HTMLResponse)
+async def run_diff(
+    request: Request,
+    config_before: UploadFile = File(...),
+    config_after:  UploadFile = File(...),
+    device_type:   str = Form(...),
+    device_name:   str = Form(""),
+):
+    """
+    Accept two versions of the same device config (before/after),
+    run audit on both, and return a change-tracking diff report.
+    """
+    if not config_before.filename or not config_after.filename:
+        raise HTTPException(status_code=400, detail="Both config files are required.")
+
+    before_raw = (await config_before.read()).decode("utf-8", errors="replace")
+    after_raw  = (await config_after.read()).decode("utf-8", errors="replace")
+
+    if not before_raw.strip() or not after_raw.strip():
+        raise HTTPException(status_code=400, detail="One or both config files appear to be empty.")
+
+    display_name = device_name.strip() or Path(config_before.filename).stem
+    timestamp    = datetime.now().isoformat()
+
+    # ── Run checks on both versions ───────────────────────────────
+    findings_before = run_all_checks(before_raw, device_type)
+    findings_after  = run_all_checks(after_raw,  device_type)
+
+    score_before = calculate_score(findings_before)
+    score_after  = calculate_score(findings_after)
+
+    # ── Build lookup maps by check_id ────────────────────────────
+    before_map = {f["check_id"]: f for f in findings_before}
+    after_map  = {f["check_id"]: f for f in findings_after}
+    all_ids    = sorted(set(before_map) | set(after_map))
+
+    NEW_RISKS    = []   # PASS/absent → FAIL/WARNING
+    RESOLVED     = []   # FAIL/WARNING → PASS
+    WORSENED     = []   # WARNING → FAIL
+    IMPROVED     = []   # FAIL → WARNING
+    UNCHANGED    = []   # same severity
+
+    SEV_RANK = {"PASS": 0, "WARNING": 1, "FAIL": 2}
+
+    for cid in all_ids:
+        b = before_map.get(cid)
+        a = after_map.get(cid)
+        sev_b = b["severity"] if b else "PASS"
+        sev_a = a["severity"] if a else "PASS"
+        rank_b = SEV_RANK.get(sev_b, 0)
+        rank_a = SEV_RANK.get(sev_a, 0)
+
+        entry = {
+            "check_id":    cid,
+            "title":       (a or b)["title"],
+            "detail_b":    b["detail"]       if b else "Check not present in before config.",
+            "detail_a":    a["detail"]       if a else "Check not present in after config.",
+            "remediation": (a or b).get("remediation", ""),
+            "sev_before":  sev_b,
+            "sev_after":   sev_a,
+        }
+
+        if rank_a > rank_b:
+            if sev_b == "PASS":
+                NEW_RISKS.append(entry)
+            else:
+                WORSENED.append(entry)
+        elif rank_a < rank_b:
+            if sev_a == "PASS":
+                RESOLVED.append(entry)
+            else:
+                IMPROVED.append(entry)
+        else:
+            UNCHANGED.append(entry)
+
+    # ── Line-level diff (unified, limited to 400 lines for performance) ──
+    before_lines = before_raw.splitlines(keepends=True)
+    after_lines  = after_raw.splitlines(keepends=True)
+    udiff = list(difflib.unified_diff(
+        before_lines, after_lines,
+        fromfile=config_before.filename,
+        tofile=config_after.filename,
+        lineterm=""
+    ))
+    # Annotate each diff line for the template
+    diff_lines = []
+    for line in udiff[:600]:   # cap at 600 lines for browser performance
+        if line.startswith("+++") or line.startswith("---") or line.startswith("@@"):
+            diff_lines.append({"type": "meta",    "text": line})
+        elif line.startswith("+"):
+            diff_lines.append({"type": "added",   "text": line})
+        elif line.startswith("-"):
+            diff_lines.append({"type": "removed", "text": line})
+        else:
+            diff_lines.append({"type": "context", "text": line})
+
+    diff_truncated = len(udiff) > 600
+
+    # ── Score delta ───────────────────────────────────────────────
+    score_delta = score_after["score"] - score_before["score"]
+
+    context = {
+        "request":        request,
+        "device_name":    display_name,
+        "device_type":    device_type,
+        "file_before":    config_before.filename,
+        "file_after":     config_after.filename,
+        "timestamp":      timestamp[:19].replace("T", " "),
+        "score_before":   score_before,
+        "score_after":    score_after,
+        "score_delta":    score_delta,
+        "new_risks":      NEW_RISKS,
+        "resolved":       RESOLVED,
+        "worsened":       WORSENED,
+        "improved":       IMPROVED,
+        "unchanged":      UNCHANGED,
+        "diff_lines":     diff_lines,
+        "diff_truncated": diff_truncated,
+        "total_changed":  len(NEW_RISKS) + len(RESOLVED) + len(WORSENED) + len(IMPROVED),
+    }
+    return templates.TemplateResponse(request=request, name="diff.html", context=context)
 
 
 @app.get("/health")

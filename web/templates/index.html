@@ -129,8 +129,46 @@
     color: var(--muted);
     max-width: 520px;
     line-height: 1.7;
-    margin-bottom: 3rem;
+    margin-bottom: 2.5rem;
     font-weight: 300;
+  }
+
+  /* ── Tabs ── */
+  .tabs {
+    display: flex;
+    gap: 0.25rem;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.25rem;
+    margin-bottom: 1.5rem;
+    width: 100%;
+    max-width: 640px;
+  }
+
+  .tab {
+    flex: 1;
+    padding: 0.55rem 1rem;
+    border: none;
+    border-radius: 7px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: transparent;
+    color: var(--muted);
+    letter-spacing: 0.03em;
+  }
+
+  .tab.active {
+    background: var(--blue);
+    color: #080b12;
+  }
+
+  .tab:not(.active):hover {
+    background: var(--surface);
+    color: var(--text);
   }
 
   /* ── Upload card ── */
@@ -153,6 +191,10 @@
     height: 1px;
     background: linear-gradient(90deg, transparent, var(--blue), transparent);
   }
+
+  /* Tab panels */
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
 
   /* ── Drop zone ── */
   .dropzone-outer {
@@ -185,7 +227,7 @@
   .dropzone-text strong { color: var(--blue); }
   .dropzone-sub  { font-size: 0.78rem; color: var(--muted); opacity: 0.6; }
 
-  /* ── File rows ── */
+  /* ── File rows (audit tab) ── */
   #fileList { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; }
 
   .file-row {
@@ -236,6 +278,59 @@
     transition: color 0.15s;
   }
   .file-row-remove:hover { color: var(--fail); }
+
+  /* ── Diff dropzones ── */
+  .diff-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  @media (max-width: 540px) { .diff-pair { grid-template-columns: 1fr; } }
+
+  .diff-dropzone {
+    border: 1.5px dashed var(--border);
+    border-radius: 10px;
+    padding: 1.5rem 1rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .diff-dropzone:hover, .diff-dropzone.drag-over {
+    border-color: var(--blue);
+    background: rgba(77,159,255,0.04);
+  }
+  .diff-dropzone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+  .diff-dropzone-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 0.4rem;
+  }
+  .diff-dropzone-label.before { color: var(--warn); }
+  .diff-dropzone-label.after  { color: var(--pass); }
+  .diff-dropzone-icon { font-size: 1.5rem; display: block; margin-bottom: 0.3rem; }
+  .diff-dropzone-text { font-size: 0.8rem; color: var(--muted); }
+  .diff-file-name {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.72rem;
+    margin-top: 0.4rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .diff-file-name.before { color: var(--warn); }
+  .diff-file-name.after  { color: var(--pass); }
 
   /* ── Form fields ── */
   .field { margin-bottom: 1.25rem; }
@@ -384,42 +479,102 @@
 
   <p>Upload one or more device config files and get a professional security report in seconds. No Python. No terminal. No setup.</p>
 
+  <!-- Mode tabs -->
+  <div class="tabs">
+    <button class="tab active" id="tabAudit" onclick="switchTab('audit')">📋 Audit</button>
+    <button class="tab"        id="tabDiff"  onclick="switchTab('diff')">⟷ Compare Configs</button>
+  </div>
+
   <div class="card">
     <div class="error-banner" id="errorBanner"></div>
 
-    <!-- Drop zone -->
-    <div class="dropzone-outer" id="dropzone">
-      <input type="file" id="fileInput" accept=".txt,.conf,.cfg,.log" multiple>
-      <span class="dropzone-icon">📄</span>
-      <div class="dropzone-text"><strong>Click to upload</strong> or drag and drop</div>
-      <div class="dropzone-sub">Supports .txt .conf .cfg — single or multiple files</div>
-    </div>
+    <!-- ═══════ AUDIT TAB ═══════ -->
+    <div class="tab-panel active" id="panelAudit">
 
-    <!-- Per-file rows (populated by JS) -->
-    <div id="fileList"></div>
+      <!-- Drop zone -->
+      <div class="dropzone-outer" id="dropzone">
+        <input type="file" id="fileInput" accept=".txt,.conf,.cfg,.log" multiple>
+        <span class="dropzone-icon">📄</span>
+        <div class="dropzone-text"><strong>Click to upload</strong> or drag and drop</div>
+        <div class="dropzone-sub">Supports .txt .conf .cfg — single or multiple files</div>
+      </div>
 
-    <!-- Custom Checks YAML (optional) -->
-    <div class="field">
-      <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;user-select:none">
-        <span>Custom Checks</span>
-        <span style="opacity:0.5;font-size:0.8rem">(optional — upload a .yaml rule file)</span>
-        <span id="customToggle" style="margin-left:auto;font-size:0.75rem;color:var(--blue);cursor:pointer" onclick="toggleCustomChecks()">+ Add</span>
-      </label>
-      <div id="customChecksSection" style="display:none;margin-top:0.5rem">
-        <div class="dropzone-outer" id="yamlDropzone" style="padding:0.75rem 1rem">
-          <input type="file" id="yamlInput" accept=".yaml,.yml">
-          <span class="dropzone-icon" style="font-size:1.2rem">📋</span>
-          <div class="dropzone-text" style="font-size:0.85rem"><strong>Click to upload</strong> your custom checks YAML</div>
-          <div class="dropzone-sub" style="font-size:0.75rem">See <code>custom_checks.example.yaml</code> in the repo for the schema</div>
-          <div id="yamlSelected" style="display:none;font-family:'Space Mono',monospace;font-size:0.78rem;color:var(--pass);margin-top:0.4rem"></div>
+      <!-- Per-file rows (populated by JS) -->
+      <div id="fileList"></div>
+
+      <!-- Custom Checks YAML (optional) -->
+      <div class="field">
+        <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;user-select:none">
+          <span>Custom Checks</span>
+          <span style="opacity:0.5;font-size:0.8rem">(optional — upload a .yaml rule file)</span>
+          <span id="customToggle" style="margin-left:auto;font-size:0.75rem;color:var(--blue);cursor:pointer" onclick="toggleCustomChecks()">+ Add</span>
+        </label>
+        <div id="customChecksSection" style="display:none;margin-top:0.5rem">
+          <div class="dropzone-outer" id="yamlDropzone" style="padding:0.75rem 1rem">
+            <input type="file" id="yamlInput" accept=".yaml,.yml">
+            <span class="dropzone-icon" style="font-size:1.2rem">📋</span>
+            <div class="dropzone-text" style="font-size:0.85rem"><strong>Click to upload</strong> your custom checks YAML</div>
+            <div class="dropzone-sub" style="font-size:0.75rem">See <code>custom_checks.example.yaml</code> in the repo for the schema</div>
+            <div id="yamlSelected" style="display:none;font-family:'Space Mono',monospace;font-size:0.78rem;color:var(--pass);margin-top:0.4rem"></div>
+          </div>
         </div>
       </div>
+
+      <button type="button" class="btn-submit" id="submitAuditBtn" onclick="submitAudit()">
+        Run Security Audit →
+      </button>
     </div>
 
-    <button type="button" class="btn-submit" id="submitBtn" onclick="submitAudit()">
-      Run Security Audit →
-    </button>
-  </div>
+    <!-- ═══════ DIFF TAB ═══════ -->
+    <div class="tab-panel" id="panelDiff">
+      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:1.25rem;line-height:1.6">
+        Upload two versions of the same device config to see what changed and whether any new security risks were introduced.
+      </p>
+
+      <!-- Before / After drop zones -->
+      <div class="diff-pair">
+        <div>
+          <div class="diff-dropzone" id="beforeDropzone">
+            <input type="file" id="beforeInput" accept=".txt,.conf,.cfg,.log">
+            <div class="diff-dropzone-label before">Before</div>
+            <span class="diff-dropzone-icon">📄</span>
+            <div class="diff-dropzone-text">Click to upload<br>original config</div>
+            <div id="beforeFileName" class="diff-file-name before" style="display:none"></div>
+          </div>
+        </div>
+        <div>
+          <div class="diff-dropzone" id="afterDropzone">
+            <input type="file" id="afterInput" accept=".txt,.conf,.cfg,.log">
+            <div class="diff-dropzone-label after">After</div>
+            <span class="diff-dropzone-icon">📄</span>
+            <div class="diff-dropzone-text">Click to upload<br>new config</div>
+            <div id="afterFileName" class="diff-file-name after" style="display:none"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Device type (shared for both) -->
+      <div class="field">
+        <label>Device Type</label>
+        <select id="diffDeviceType">
+          {% for value, label in device_types %}
+          <option value="{{ value }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Device name (optional) -->
+      <div class="field">
+        <label>Device Name <span style="opacity:0.5;font-weight:400;text-transform:none">(optional)</span></label>
+        <input type="text" id="diffDeviceName" placeholder="e.g. core-router-01">
+      </div>
+
+      <button type="button" class="btn-submit" id="submitDiffBtn" onclick="submitDiff()">
+        Compare Configs →
+      </button>
+    </div>
+
+  </div><!-- .card -->
 
   <div class="features">
     <div class="feature">
@@ -436,7 +591,7 @@
     </div>
     <div class="feature">
       <div class="feature-dot" style="background:#ff79c6"></div>
-      Multi-device upload
+      Config diff &amp; change tracking
     </div>
   </div>
 </main>
@@ -453,25 +608,34 @@
     {% endfor %}
   ];
 
-  // Selected files list (File objects)
+  // ── Tab switching ─────────────────────────────────────────────
+  function switchTab(tab) {
+    document.getElementById('panelAudit').classList.toggle('active', tab === 'audit');
+    document.getElementById('panelDiff').classList.toggle('active',  tab === 'diff');
+    document.getElementById('tabAudit').classList.toggle('active',   tab === 'audit');
+    document.getElementById('tabDiff').classList.toggle('active',    tab === 'diff');
+    clearError();
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // AUDIT TAB
+  // ─────────────────────────────────────────────────────────────
+
   let selectedFiles = [];
 
   const dropzone    = document.getElementById('dropzone');
   const fileInput   = document.getElementById('fileInput');
   const fileList    = document.getElementById('fileList');
   const overlay     = document.getElementById('loadingOverlay');
-  const submitBtn   = document.getElementById('submitBtn');
   const errorBanner = document.getElementById('errorBanner');
 
-  // ── Build device type <select> HTML ──────────────────────────
-  function buildSelect(name, idx) {
+  function buildSelect(idx) {
     const opts = DEVICE_TYPES.map(dt =>
       `<option value="${dt.value}"${dt.value === 'cisco_ios' ? ' selected' : ''}>${dt.label}</option>`
     ).join('');
     return `<select id="dt_${idx}" title="Device type">${opts}</select>`;
   }
 
-  // ── Render the per-file rows ──────────────────────────────────
   function renderFileList() {
     fileList.innerHTML = '';
     selectedFiles.forEach((file, idx) => {
@@ -479,7 +643,7 @@
       row.className = 'file-row';
       row.innerHTML = `
         <span class="file-row-name" title="${file.name}">✓ ${file.name}</span>
-        ${buildSelect('device_types', idx)}
+        ${buildSelect(idx)}
         <button class="file-row-remove" title="Remove" onclick="removeFile(${idx})">✕</button>
       `;
       fileList.appendChild(row);
@@ -491,7 +655,6 @@
     renderFileList();
   }
 
-  // ── Add files (de-duplicate by name) ─────────────────────────
   function addFiles(newFiles) {
     const existingNames = new Set(selectedFiles.map(f => f.name));
     for (const f of newFiles) {
@@ -503,10 +666,9 @@
     renderFileList();
   }
 
-  // ── File input events ─────────────────────────────────────────
   fileInput.addEventListener('change', () => {
     if (fileInput.files.length > 0) addFiles(Array.from(fileInput.files));
-    fileInput.value = ''; // reset so same file can be re-added after removal
+    fileInput.value = '';
   });
 
   dropzone.addEventListener('dragover',  e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
@@ -517,7 +679,6 @@
     if (e.dataTransfer.files.length > 0) addFiles(Array.from(e.dataTransfer.files));
   });
 
-  // ── Custom checks YAML toggle ─────────────────────────────────
   const yamlInput    = document.getElementById('yamlInput');
   const yamlSelected = document.getElementById('yamlSelected');
 
@@ -537,52 +698,33 @@
     }
   });
 
-  // ── Show / hide error banner ──────────────────────────────────
   function showError(msg) {
     errorBanner.textContent = msg;
     errorBanner.style.display = 'block';
   }
   function clearError() { errorBanner.style.display = 'none'; }
 
-  // ── Submit via fetch (supports multiple files) ────────────────
   async function submitAudit() {
     clearError();
-
     if (selectedFiles.length === 0) {
       showError('Please upload at least one config file.');
       return;
     }
-
     const fd = new FormData();
-
-    // Attach each file with the field name 'config_files'
-    selectedFiles.forEach((file, idx) => {
-      fd.append('config_files', file);
-    });
-
-    // Attach corresponding device types
+    selectedFiles.forEach(f => fd.append('config_files', f));
     selectedFiles.forEach((_, idx) => {
       const sel = document.getElementById(`dt_${idx}`);
       fd.append('device_types', sel ? sel.value : 'cisco_ios');
     });
-
-    // Attach device names (empty strings are fine)
     selectedFiles.forEach(() => fd.append('device_names', ''));
+    if (yamlInput.files.length > 0) fd.append('custom_checks_file', yamlInput.files[0]);
 
-    // Optional custom checks YAML
-    if (yamlInput.files.length > 0) {
-      fd.append('custom_checks_file', yamlInput.files[0]);
-    }
-
-    // Show overlay
     const count = selectedFiles.length;
-    document.getElementById('loadingText').textContent =
-      count === 1 ? 'Running audit checks...' : `Auditing ${count} devices...`;
-    document.getElementById('loadingSub').textContent =
-      'Analysing configuration against vendor-specific security checks';
+    document.getElementById('loadingText').textContent = count === 1 ? 'Running audit checks...' : `Auditing ${count} devices...`;
+    document.getElementById('loadingSub').textContent  = 'Analysing configuration against vendor-specific security checks';
     overlay.classList.add('active');
-    submitBtn.classList.add('loading');
-    submitBtn.textContent = 'Analysing...';
+    const btn = document.getElementById('submitAuditBtn');
+    btn.classList.add('loading'); btn.textContent = 'Analysing...';
 
     try {
       const resp = await fetch('/audit', { method: 'POST', body: fd });
@@ -591,16 +733,88 @@
         throw new Error(err.detail || `Server error ${resp.status}`);
       }
       const html = await resp.text();
-      document.open();
-      document.write(html);
-      document.close();
+      document.open(); document.write(html); document.close();
     } catch (err) {
       overlay.classList.remove('active');
-      submitBtn.classList.remove('loading');
-      submitBtn.textContent = 'Run Security Audit →';
+      btn.classList.remove('loading'); btn.textContent = 'Run Security Audit →';
       showError('Audit failed: ' + err.message);
     }
   }
+
+  // ─────────────────────────────────────────────────────────────
+  // DIFF TAB
+  // ─────────────────────────────────────────────────────────────
+
+  const beforeInput = document.getElementById('beforeInput');
+  const afterInput  = document.getElementById('afterInput');
+
+  function setDiffFile(which, file) {
+    const nameEl = document.getElementById(`${which}FileName`);
+    const zone   = document.getElementById(`${which}Dropzone`);
+    nameEl.textContent   = '✓ ' + file.name;
+    nameEl.style.display = 'block';
+    zone.style.borderColor = which === 'before' ? 'var(--warn)' : 'var(--pass)';
+  }
+
+  beforeInput.addEventListener('change', () => {
+    if (beforeInput.files.length > 0) setDiffFile('before', beforeInput.files[0]);
+  });
+  afterInput.addEventListener('change', () => {
+    if (afterInput.files.length > 0) setDiffFile('after', afterInput.files[0]);
+  });
+
+  // Drag and drop for diff zones
+  ['before', 'after'].forEach(which => {
+    const zone  = document.getElementById(`${which}Dropzone`);
+    const input = document.getElementById(`${which}Input`);
+    zone.addEventListener('dragover',  e => { e.preventDefault(); zone.classList.add('drag-over'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+    zone.addEventListener('drop', e => {
+      e.preventDefault(); zone.classList.remove('drag-over');
+      if (e.dataTransfer.files.length > 0) {
+        // Assign the dropped file to the hidden input (creates a DataTransfer)
+        const dt = new DataTransfer();
+        dt.items.add(e.dataTransfer.files[0]);
+        input.files = dt.files;
+        setDiffFile(which, e.dataTransfer.files[0]);
+      }
+    });
+  });
+
+  async function submitDiff() {
+    clearError();
+    if (!beforeInput.files.length) { showError('Please upload the Before config.'); return; }
+    if (!afterInput.files.length)  { showError('Please upload the After config.');  return; }
+
+    const fd = new FormData();
+    fd.append('config_before', beforeInput.files[0]);
+    fd.append('config_after',  afterInput.files[0]);
+    fd.append('device_type',   document.getElementById('diffDeviceType').value);
+    fd.append('device_name',   document.getElementById('diffDeviceName').value);
+
+    document.getElementById('loadingText').textContent = 'Comparing configs...';
+    document.getElementById('loadingSub').textContent  = 'Running audit on both versions and calculating risk delta';
+    overlay.classList.add('active');
+    const btn = document.getElementById('submitDiffBtn');
+    btn.classList.add('loading'); btn.textContent = 'Comparing...';
+
+    try {
+      const resp = await fetch('/diff', { method: 'POST', body: fd });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ detail: 'Unknown error' }));
+        throw new Error(err.detail || `Server error ${resp.status}`);
+      }
+      const html = await resp.text();
+      document.open(); document.write(html); document.close();
+    } catch (err) {
+      overlay.classList.remove('active');
+      btn.classList.remove('loading'); btn.textContent = 'Compare Configs →';
+      showError('Diff failed: ' + err.message);
+    }
+  }
+
+  // Open diff tab if URL hash says so
+  if (window.location.hash === '#diff') switchTab('diff');
 </script>
 
 </body>

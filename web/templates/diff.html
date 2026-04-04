@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ConfigSentry — Config Diff</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#080b12;--surface:#0f1420;--surface2:#141926;--border:#1e2535;
+    --blue:#4d9fff;--text:#e2e8f0;--muted:#5a6a85;
+    --fail-bg:#2a0f0f;--fail-fg:#ff5555;
+    --warn-bg:#2a1a0a;--warn-fg:#ffb347;
+    --pass-bg:#0a1f0f;--pass-fg:#50fa7b;
+    --new-bg:#2a0f0f;--new-fg:#ff5555;
+    --resolved-bg:#0a1f0f;--resolved-fg:#50fa7b;
+    --improved-bg:#0a1520;--improved-fg:#4d9fff;
+    --worsened-bg:#2a1a0a;--worsened-fg:#ffb347;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(77,159,255,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(77,159,255,0.02) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
+
+  .topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;padding:1rem 2rem;border-bottom:1px solid var(--border);background:rgba(8,11,18,0.92);backdrop-filter:blur(12px)}
+  .logo{font-family:'Space Mono',monospace;font-size:1rem;color:var(--blue);text-decoration:none;display:flex;align-items:center;gap:0.5rem}
+  .logo-dot{width:7px;height:7px;background:var(--blue);border-radius:50%;animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+  .btn{display:inline-flex;align-items:center;gap:0.4rem;padding:0.5rem 1rem;border-radius:7px;font-size:0.82rem;font-weight:500;text-decoration:none;cursor:pointer;transition:all 0.2s;border:1px solid var(--border);background:transparent;color:var(--muted)}
+  .btn:hover{color:var(--text);border-color:var(--blue)}
+
+  .container{position:relative;z-index:1;max-width:980px;margin:0 auto;padding:2.5rem 1.5rem 4rem}
+
+  /* ── Page header ── */
+  .page-header{margin-bottom:2rem}
+  .page-header h1{font-family:'Space Mono',monospace;font-size:1.4rem;margin-bottom:0.35rem}
+  .page-meta{font-size:0.82rem;color:var(--muted);display:flex;gap:1rem;flex-wrap:wrap;align-items:center}
+  .mode-badge{display:inline-block;padding:0.15rem 0.55rem;border-radius:4px;font-size:0.7rem;font-weight:700;background:var(--surface2);color:var(--muted);font-family:'Space Mono',monospace}
+
+  /* ── Score comparison card ── */
+  .score-compare{display:grid;grid-template-columns:1fr auto 1fr;gap:1rem;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1.5rem 2rem;margin-bottom:1.5rem;position:relative;overflow:hidden}
+  .score-compare::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--warn-fg),transparent 30%,transparent 70%,var(--pass-fg))}
+  .score-block{text-align:center}
+  .score-block-label{font-family:'Space Mono',monospace;font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:0.4rem}
+  .score-block-label.before{color:var(--warn-fg)}
+  .score-block-label.after{color:var(--pass-fg)}
+  .score-val{font-family:'Space Mono',monospace;font-size:2.5rem;font-weight:700;line-height:1}
+  .score-val .denom{font-size:1rem;opacity:0.4}
+  .score-val.low{color:var(--pass-fg)}.score-val.guarded{color:var(--blue)}.score-val.elevated{color:var(--warn-fg)}.score-val.high{color:var(--fail-fg)}.score-val.critical{color:#ff3311}
+  .score-level{font-size:0.78rem;margin-top:0.3rem;font-weight:500}
+  .score-level.low{color:var(--pass-fg)}.score-level.guarded{color:var(--blue)}.score-level.elevated{color:var(--warn-fg)}.score-level.high{color:var(--fail-fg)}.score-level.critical{color:#ff3311}
+  .score-file{font-size:0.7rem;color:var(--muted);margin-top:0.25rem;font-family:'Space Mono',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px}
+
+  .score-arrow{text-align:center;padding:0 0.5rem}
+  .delta{font-family:'Space Mono',monospace;font-size:1.5rem;font-weight:700}
+  .delta.worse{color:var(--fail-fg)}
+  .delta.better{color:var(--pass-fg)}
+  .delta.same{color:var(--muted)}
+  .delta-label{font-size:0.72rem;color:var(--muted);margin-top:0.2rem}
+
+  @media(max-width:520px){.score-compare{grid-template-columns:1fr;}.score-arrow{transform:rotate(90deg)}}
+
+  /* ── Summary pills row ── */
+  .change-summary{display:flex;gap:0.6rem;flex-wrap:wrap;margin-bottom:1.5rem}
+  .cs-pill{display:flex;align-items:center;gap:0.4rem;padding:0.35rem 0.85rem;border-radius:8px;font-size:0.78rem;font-weight:700;font-family:'Space Mono',monospace}
+  .cs-pill.new{background:var(--new-bg);color:var(--new-fg);border:1px solid rgba(255,85,85,0.3)}
+  .cs-pill.resolved{background:var(--resolved-bg);color:var(--resolved-fg);border:1px solid rgba(80,250,123,0.3)}
+  .cs-pill.worsened{background:var(--worsened-bg);color:var(--worsened-fg);border:1px solid rgba(255,179,71,0.3)}
+  .cs-pill.improved{background:var(--improved-bg);color:var(--improved-fg);border:1px solid rgba(77,159,255,0.3)}
+  .cs-pill.unchanged{background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
+  .no-changes{background:var(--pass-bg);border:1px solid rgba(80,250,123,0.3);border-radius:10px;padding:1.25rem 1.5rem;margin-bottom:1.5rem;font-size:0.9rem;color:var(--pass-fg);text-align:center}
+
+  /* ── Section title ── */
+  .section-title{font-family:'Space Mono',monospace;font-size:0.75rem;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin:1.75rem 0 0.65rem}
+
+  /* ── Change finding cards ── */
+  .change-card{border-radius:10px;padding:1rem 1.25rem;margin-bottom:0.6rem;border-left:3px solid transparent}
+  .change-card.new-risk{background:var(--new-bg);border-left-color:var(--new-fg)}
+  .change-card.resolved{background:var(--resolved-bg);border-left-color:var(--resolved-fg)}
+  .change-card.worsened{background:var(--worsened-bg);border-left-color:var(--worsened-fg)}
+  .change-card.improved{background:var(--improved-bg);border-left-color:var(--improved-fg)}
+
+  .change-header{display:flex;align-items:center;gap:0.65rem;flex-wrap:wrap;margin-bottom:0.4rem}
+  .check-id{font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted)}
+  .sev-badge{padding:0.15rem 0.55rem;border-radius:4px;font-size:0.7rem;font-weight:700;font-family:'Space Mono',monospace}
+  .sev-badge.FAIL{background:rgba(255,85,85,0.2);color:var(--fail-fg)}
+  .sev-badge.WARNING{background:rgba(255,179,71,0.2);color:var(--warn-fg)}
+  .sev-badge.PASS{background:rgba(80,250,123,0.2);color:var(--pass-fg)}
+  .change-arrow{font-size:0.75rem;color:var(--muted)}
+  .change-title{font-weight:500;font-size:0.9rem}
+  .change-detail{font-size:0.82rem;color:var(--muted);margin-top:0.25rem;line-height:1.6}
+  .change-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-top:0.4rem}
+  @media(max-width:500px){.change-detail-grid{grid-template-columns:1fr}}
+  .detail-cell{background:rgba(255,255,255,0.03);border-radius:6px;padding:0.5rem 0.75rem;font-size:0.78rem;color:var(--muted);line-height:1.5}
+  .detail-cell-label{font-family:'Space Mono',monospace;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.2rem}
+  .detail-cell-label.before{color:var(--warn-fg)}
+  .detail-cell-label.after{color:var(--pass-fg)}
+  .change-remediation{font-size:0.8rem;color:var(--blue);margin-top:0.35rem}
+
+  /* ── Unchanged (collapsible) ── */
+  .unchanged-toggle{display:flex;align-items:center;gap:0.5rem;cursor:pointer;font-size:0.82rem;color:var(--muted);user-select:none;margin-top:1.5rem;margin-bottom:0.5rem}
+  .unchanged-toggle:hover{color:var(--text)}
+  .unchanged-toggle .arrow{transition:transform 0.2s;display:inline-block}
+  .unchanged-toggle.open .arrow{transform:rotate(90deg)}
+  .unchanged-list{display:none}
+  .unchanged-list.open{display:block}
+  .unchanged-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0.65rem 1rem;margin-bottom:0.4rem;display:flex;align-items:center;gap:0.6rem;font-size:0.82rem}
+  .unchanged-card .check-id{color:var(--muted)}
+  .unchanged-card .change-title{font-size:0.82rem;color:var(--text)}
+
+  /* ── Raw diff viewer ── */
+  .diff-viewer{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-top:2rem}
+  .diff-viewer-header{padding:0.75rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:0.75rem}
+  .diff-viewer-title{font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase}
+  .diff-viewer-files{font-family:'Space Mono',monospace;font-size:0.7rem;color:var(--muted);display:flex;gap:1rem;flex-wrap:wrap}
+  .diff-viewer-file.before{color:var(--warn-fg)}.diff-viewer-file.after{color:var(--pass-fg)}
+  .diff-body{overflow:auto;max-height:500px;font-family:'Space Mono',monospace;font-size:0.75rem;line-height:1.6}
+  .diff-line{padding:0.05rem 1rem;white-space:pre;display:block;min-width:max-content}
+  .diff-line.added{background:rgba(80,250,123,0.07);color:var(--pass-fg)}
+  .diff-line.removed{background:rgba(255,85,85,0.07);color:var(--fail-fg)}
+  .diff-line.meta{color:var(--blue);background:rgba(77,159,255,0.05)}
+  .diff-line.context{color:var(--muted)}
+  .diff-empty{padding:1.5rem;text-align:center;font-size:0.82rem;color:var(--muted)}
+  .diff-truncated{padding:0.5rem 1rem;background:var(--warn-bg);color:var(--warn-fg);font-size:0.75rem;font-family:'Space Mono',monospace;text-align:center}
+
+  .new-audit{margin-top:3rem;padding:2rem;background:var(--surface);border:1px solid var(--border);border-radius:14px;text-align:center}
+  .new-audit p{font-size:0.9rem;color:var(--muted);margin-bottom:1rem}
+  .btn-primary{background:var(--blue);color:#080b12;border:none;border-radius:8px;padding:0.7rem 1.5rem;font-family:'Space Mono',monospace;font-size:0.82rem;font-weight:700;cursor:pointer;text-decoration:none;display:inline-block;transition:background 0.2s}
+  .btn-primary:hover{background:#6ab3ff}
+</style>
+</head>
+<body>
+
+<nav class="topbar">
+  <a href="/" class="logo"><div class="logo-dot"></div>ConfigSentry</a>
+  <div style="display:flex;gap:0.5rem">
+    <a href="/#diff" class="btn">⟷ New Diff</a>
+    <a href="/"      class="btn">← Audit</a>
+  </div>
+</nav>
+
+<div class="container">
+
+  <!-- Page header -->
+  <div class="page-header">
+    <h1>Config Diff — {{ device_name }}</h1>
+    <div class="page-meta">
+      <span>🖥 {{ device_type }}</span>
+      <span>🕐 {{ timestamp }}</span>
+      <span class="mode-badge">CHANGE TRACKING</span>
+    </div>
+  </div>
+
+  <!-- Score comparison -->
+  {% set lc_b = score_before.risk_level | lower %}
+  {% set lc_a = score_after.risk_level  | lower %}
+  <div class="score-compare">
+    <div class="score-block">
+      <div class="score-block-label before">Before</div>
+      <div class="score-val {{ lc_b }}">{{ score_before.score }}<span class="denom">/100</span></div>
+      <div class="score-level {{ lc_b }}">{{ score_before.risk_level }}</div>
+      <div class="score-file">{{ file_before }}</div>
+    </div>
+
+    <div class="score-arrow">
+      {% if score_delta > 0 %}
+        <div class="delta worse">+{{ score_delta }}</div>
+        <div class="delta-label">risk increased</div>
+      {% elif score_delta < 0 %}
+        <div class="delta better">{{ score_delta }}</div>
+        <div class="delta-label">risk reduced</div>
+      {% else %}
+        <div class="delta same">±0</div>
+        <div class="delta-label">no change</div>
+      {% endif %}
+    </div>
+
+    <div class="score-block">
+      <div class="score-block-label after">After</div>
+      <div class="score-val {{ lc_a }}">{{ score_after.score }}<span class="denom">/100</span></div>
+      <div class="score-level {{ lc_a }}">{{ score_after.risk_level }}</div>
+      <div class="score-file">{{ file_after }}</div>
+    </div>
+  </div>
+
+  <!-- Change summary pills -->
+  {% if total_changed == 0 %}
+  <div class="no-changes">✓ No security findings changed between these two configs.</div>
+  {% else %}
+  <div class="change-summary">
+    {% if new_risks %}
+    <div class="cs-pill new">⚠ {{ new_risks | length }} new risk{{ 's' if new_risks | length != 1 }}</div>
+    {% endif %}
+    {% if worsened %}
+    <div class="cs-pill worsened">↑ {{ worsened | length }} worsened</div>
+    {% endif %}
+    {% if resolved %}
+    <div class="cs-pill resolved">✓ {{ resolved | length }} resolved</div>
+    {% endif %}
+    {% if improved %}
+    <div class="cs-pill improved">↓ {{ improved | length }} improved</div>
+    {% endif %}
+    <div class="cs-pill unchanged">{{ unchanged | length }} unchanged</div>
+  </div>
+  {% endif %}
+
+  <!-- New risks (PASS/absent → FAIL/WARNING) -->
+  {% if new_risks %}
+  <div class="section-title">⚠ New Risks Introduced — {{ new_risks | length }}</div>
+  {% for c in new_risks %}
+  <div class="change-card new-risk">
+    <div class="change-header">
+      <span class="check-id">{{ c.check_id }}</span>
+      <span class="sev-badge PASS">PASS</span>
+      <span class="change-arrow">→</span>
+      <span class="sev-badge {{ c.sev_after }}">{{ c.sev_after }}</span>
+      <span class="change-title">{{ c.title }}</span>
+    </div>
+    <div class="change-detail-grid">
+      <div class="detail-cell">
+        <div class="detail-cell-label before">Before</div>
+        {{ c.detail_b }}
+      </div>
+      <div class="detail-cell">
+        <div class="detail-cell-label after">After</div>
+        {{ c.detail_a }}
+      </div>
+    </div>
+    {% if c.remediation %}
+    <div class="change-remediation">→ {{ c.remediation }}</div>
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  <!-- Worsened (WARNING → FAIL) -->
+  {% if worsened %}
+  <div class="section-title">↑ Worsened — {{ worsened | length }}</div>
+  {% for c in worsened %}
+  <div class="change-card worsened">
+    <div class="change-header">
+      <span class="check-id">{{ c.check_id }}</span>
+      <span class="sev-badge {{ c.sev_before }}">{{ c.sev_before }}</span>
+      <span class="change-arrow">→</span>
+      <span class="sev-badge {{ c.sev_after }}">{{ c.sev_after }}</span>
+      <span class="change-title">{{ c.title }}</span>
+    </div>
+    <div class="change-detail-grid">
+      <div class="detail-cell">
+        <div class="detail-cell-label before">Before</div>
+        {{ c.detail_b }}
+      </div>
+      <div class="detail-cell">
+        <div class="detail-cell-label after">After</div>
+        {{ c.detail_a }}
+      </div>
+    </div>
+    {% if c.remediation %}
+    <div class="change-remediation">→ {{ c.remediation }}</div>
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  <!-- Improved (FAIL → WARNING) -->
+  {% if improved %}
+  <div class="section-title">↓ Improved — {{ improved | length }}</div>
+  {% for c in improved %}
+  <div class="change-card improved">
+    <div class="change-header">
+      <span class="check-id">{{ c.check_id }}</span>
+      <span class="sev-badge {{ c.sev_before }}">{{ c.sev_before }}</span>
+      <span class="change-arrow">→</span>
+      <span class="sev-badge {{ c.sev_after }}">{{ c.sev_after }}</span>
+      <span class="change-title">{{ c.title }}</span>
+    </div>
+    <div class="change-detail-grid">
+      <div class="detail-cell">
+        <div class="detail-cell-label before">Before</div>
+        {{ c.detail_b }}
+      </div>
+      <div class="detail-cell">
+        <div class="detail-cell-label after">After</div>
+        {{ c.detail_a }}
+      </div>
+    </div>
+    {% if c.remediation %}
+    <div class="change-remediation">→ {{ c.remediation }}</div>
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  <!-- Resolved (FAIL/WARNING → PASS) -->
+  {% if resolved %}
+  <div class="section-title">✓ Resolved — {{ resolved | length }}</div>
+  {% for c in resolved %}
+  <div class="change-card resolved">
+    <div class="change-header">
+      <span class="check-id">{{ c.check_id }}</span>
+      <span class="sev-badge {{ c.sev_before }}">{{ c.sev_before }}</span>
+      <span class="change-arrow">→</span>
+      <span class="sev-badge PASS">PASS</span>
+      <span class="change-title">{{ c.title }}</span>
+    </div>
+    <div class="change-detail-grid">
+      <div class="detail-cell">
+        <div class="detail-cell-label before">Before</div>
+        {{ c.detail_b }}
+      </div>
+      <div class="detail-cell">
+        <div class="detail-cell-label after">After</div>
+        {{ c.detail_a }}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  <!-- Unchanged (collapsible) -->
+  {% if unchanged %}
+  <div class="unchanged-toggle" id="unchangedToggle" onclick="toggleUnchanged()">
+    <span class="arrow">▶</span>
+    <span>{{ unchanged | length }} unchanged check{{ 's' if unchanged | length != 1 }} — click to expand</span>
+  </div>
+  <div class="unchanged-list" id="unchangedList">
+    {% for c in unchanged %}
+    <div class="unchanged-card">
+      <span class="check-id">{{ c.check_id }}</span>
+      <span class="sev-badge {{ c.sev_after }}">{{ c.sev_after }}</span>
+      <span class="change-title">{{ c.title }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Raw line diff -->
+  <div class="diff-viewer">
+    <div class="diff-viewer-header">
+      <span class="diff-viewer-title">Raw Config Diff</span>
+      <div class="diff-viewer-files">
+        <span class="diff-viewer-file before">− {{ file_before }}</span>
+        <span class="diff-viewer-file after">+ {{ file_after }}</span>
+      </div>
+    </div>
+    <div class="diff-body" id="diffBody">
+      {% if diff_lines %}
+        {% for line in diff_lines %}
+        <span class="diff-line {{ line.type }}">{{ line.text }}</span>
+        {% endfor %}
+      {% else %}
+        <div class="diff-empty">Files are identical — no line-level differences found.</div>
+      {% endif %}
+    </div>
+    {% if diff_truncated %}
+    <div class="diff-truncated">⚠ Diff truncated to 600 lines for display. Download the configs to view the full diff locally.</div>
+    {% endif %}
+  </div>
+
+  <div class="new-audit">
+    <p>Run another comparison or start a new audit?</p>
+    <div style="display:flex;gap:0.75rem;justify-content:center;flex-wrap:wrap">
+      <a href="/#diff" class="btn-primary">⟷ New Diff</a>
+      <a href="/"      style="display:inline-block;padding:0.7rem 1.5rem;border:1px solid var(--border);border-radius:8px;font-size:0.82rem;color:var(--muted);text-decoration:none;transition:all 0.2s" onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--blue)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)'">← Run Audit</a>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function toggleUnchanged() {
+    const toggle = document.getElementById('unchangedToggle');
+    const list   = document.getElementById('unchangedList');
+    toggle.classList.toggle('open');
+    list.classList.toggle('open');
+  }
+</script>
+</body>
+</html>
