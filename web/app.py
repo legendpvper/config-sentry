@@ -12,7 +12,7 @@ import tempfile
 import uuid
 from pathlib import Path
 from datetime import datetime
-from typing import List  # kept for future use
+from typing import List
 
 from fastapi import FastAPI, File, UploadFile, Form, Request, HTTPException
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
@@ -79,87 +79,118 @@ async def index(request: Request):
 @app.post("/audit", response_class=HTMLResponse)
 async def run_audit(
     request: Request,
-    config_file: UploadFile = File(...),
-    device_type: str = Form(...),
-    device_name: str = Form(""),
+    config_files: List[UploadFile] = File(...),
+    device_types: List[str] = Form(...),
+    device_names: List[str] = Form(default=[]),
     custom_checks_file: UploadFile = File(None),
 ):
     """
-    Accept a config file upload (and optional custom checks YAML),
-    run audit, return results page.
+    Accept one or more config file uploads (and optional custom checks YAML),
+    run audit on each, return combined results page.
     """
-    if not config_file.filename:
+    if not config_files or not config_files[0].filename:
         raise HTTPException(status_code=400, detail="No file uploaded.")
 
-    content = await config_file.read()
-    if not content:
-        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+    # Normalise device_names list to match length of config_files
+    names_list = list(device_names) if device_names else []
+    while len(names_list) < len(config_files):
+        names_list.append("")
 
-    try:
-        raw_config = content.decode("utf-8", errors="replace")
-    except Exception:
-        raise HTTPException(status_code=400, detail="Could not read file. Please upload a plain text config file.")
-
-    session_id   = str(uuid.uuid4())[:8]
-    timestamp    = datetime.now().isoformat()
-    display_name = device_name.strip() or Path(config_file.filename).stem
-
-    findings = run_all_checks(raw_config, device_type)
-
-    # Run custom checks if a YAML file was uploaded
+    # Load custom checks once (shared across all uploaded files)
+    custom_check_defs = []
     custom_check_count = 0
     if custom_checks_file and custom_checks_file.filename:
         try:
             from custom_checks import load_custom_checks_from_string, run_custom_checks
             yaml_content = (await custom_checks_file.read()).decode("utf-8", errors="replace")
-            custom_defs  = load_custom_checks_from_string(yaml_content)
-            if custom_defs:
-                extra = run_custom_checks(raw_config, device_type, custom_defs)
-                findings.extend(extra)
-                custom_check_count = len(custom_defs)
+            custom_check_defs = load_custom_checks_from_string(yaml_content) or []
+            custom_check_count = len(custom_check_defs)
         except Exception:
             pass  # Custom checks are optional — silently skip on any error
 
-    score_data = calculate_score(findings)
+    session_id = str(uuid.uuid4())[:8]
+    timestamp  = datetime.now().isoformat()
+    results    = []
 
-    result = {
-        "host":       config_file.filename,
-        "hostname":   display_name,
-        "mode":       "offline",
-        "status":     "OK",
-        "findings":   findings,
-        "score":      score_data,
-        "raw_config": raw_config,
-        "timestamp":  timestamp,
-        "fails":      [f for f in findings if f["severity"] == "FAIL"],
-        "warnings":   [f for f in findings if f["severity"] == "WARNING"],
-        "passes":     [f for f in findings if f["severity"] == "PASS"],
-    }
+    for idx, (upload, device_type, raw_name) in enumerate(
+        zip(config_files, device_types, names_list)
+    ):
+        if not upload.filename:
+            continue
 
-    # Generate PDF report
+        content = await upload.read()
+        if not content:
+            continue
+
+        try:
+            raw_config = content.decode("utf-8", errors="replace")
+        except Exception:
+            continue
+
+        display_name = raw_name.strip() or Path(upload.filename).stem
+
+        findings = run_all_checks(raw_config, device_type)
+
+        if custom_check_defs:
+            from custom_checks import run_custom_checks
+            extra    = run_custom_checks(raw_config, device_type, custom_check_defs)
+            findings.extend(extra)
+
+        score_data = calculate_score(findings)
+
+        results.append({
+            "host":        upload.filename,
+            "hostname":    display_name,
+            "device_type": device_type,
+            "mode":        "offline",
+            "status":      "OK",
+            "findings":    findings,
+            "score":       score_data,
+            "raw_config":  raw_config,
+            "timestamp":   timestamp,
+            "fails":       [f for f in findings if f["severity"] == "FAIL"],
+            "warnings":    [f for f in findings if f["severity"] == "WARNING"],
+            "passes":      [f for f in findings if f["severity"] == "PASS"],
+        })
+
+    if not results:
+        raise HTTPException(status_code=400, detail="No valid config files could be processed.")
+
+    multi = len(results) > 1
+
+    # Generate combined PDF report
     pdf_filename = f"audit_{session_id}.pdf"
     pdf_path     = REPORTS_DIR / pdf_filename
-    generate_report([result], output_path=str(pdf_path), fmt="pdf")
+    generate_report(results, output_path=str(pdf_path), fmt="pdf")
 
-    # Generate remediation script
-    rem_filename = f"remediation_{session_id}.txt"
-    rem_path     = REPORTS_DIR / rem_filename
-    generate_remediation_script(result, device_type, str(rem_path))
+    # Generate per-device remediation scripts
+    rem_files = []
+    for result in results:
+        rem_filename = f"remediation_{session_id}_{result['hostname']}.txt"
+        rem_path     = REPORTS_DIR / rem_filename
+        generate_remediation_script(result, result["device_type"], str(rem_path))
+        rem_files.append({"name": result["hostname"], "url": f"/download/{rem_filename}"})
+
+    # Summary stats
+    total_fails    = sum(len(r["fails"])    for r in results)
+    total_warnings = sum(len(r["warnings"]) for r in results)
+    total_passes   = sum(len(r["passes"])   for r in results)
+    worst          = max(results, key=lambda r: r["score"]["score"])
 
     context = {
-        "request":           request,
-        "results":           [result],
-        "device_type":       device_type,
-        "timestamp":         timestamp[:19].replace("T", " "),
-        "pdf_url":           f"/download/{pdf_filename}",
-        "rem_files":         [{"name": display_name, "url": f"/download/{rem_filename}"}],
-        "total_fails":       len(result["fails"]),
-        "total_warnings":    len(result["warnings"]),
-        "total_passes":      len(result["passes"]),
-        "worst_score":       score_data["score"],
-        "worst_level":       score_data["risk_level"],
-        "multi":             False,
-        "device_types":      SUPPORTED_DEVICE_TYPES,
+        "request":            request,
+        "results":            results,
+        "device_type":        results[0]["device_type"] if not multi else "multiple",
+        "timestamp":          timestamp[:19].replace("T", " "),
+        "pdf_url":            f"/download/{pdf_filename}",
+        "rem_files":          rem_files,
+        "total_fails":        total_fails,
+        "total_warnings":     total_warnings,
+        "total_passes":       total_passes,
+        "worst_score":        worst["score"]["score"],
+        "worst_level":        worst["score"]["risk_level"],
+        "multi":              multi,
+        "device_types":       SUPPORTED_DEVICE_TYPES,
         "custom_check_count": custom_check_count,
     }
     return templates.TemplateResponse(request=request, name="results.html", context=context)

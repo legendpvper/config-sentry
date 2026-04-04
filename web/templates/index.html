@@ -10,6 +10,7 @@
   :root {
     --bg:       #080b12;
     --surface:  #0f1420;
+    --surface2: #141926;
     --border:   #1e2535;
     --blue:     #4d9fff;
     --blue-dim: #1a3a6e;
@@ -31,7 +32,6 @@
     flex-direction: column;
   }
 
-  /* ── Grid background ── */
   body::before {
     content: '';
     position: fixed;
@@ -44,7 +44,6 @@
     z-index: 0;
   }
 
-  /* ── Top bar ── */
   .topbar {
     position: relative;
     z-index: 10;
@@ -87,7 +86,6 @@
   }
   .topbar-link:hover { color: var(--blue); }
 
-  /* ── Hero ── */
   .hero {
     position: relative;
     z-index: 1;
@@ -142,7 +140,7 @@
     border-radius: 16px;
     padding: 2.5rem;
     width: 100%;
-    max-width: 560px;
+    max-width: 640px;
     position: relative;
   }
 
@@ -157,23 +155,23 @@
   }
 
   /* ── Drop zone ── */
-  .dropzone {
+  .dropzone-outer {
     border: 1.5px dashed var(--border);
     border-radius: 10px;
     padding: 2.5rem 1.5rem;
     text-align: center;
     cursor: pointer;
     transition: all 0.2s;
-    margin-bottom: 1.5rem;
+    margin-bottom: 1rem;
     position: relative;
   }
 
-  .dropzone:hover, .dropzone.drag-over {
+  .dropzone-outer:hover, .dropzone-outer.drag-over {
     border-color: var(--blue);
     background: rgba(77,159,255,0.04);
   }
 
-  .dropzone input[type="file"] {
+  .dropzone-outer input[type="file"] {
     position: absolute;
     inset: 0;
     opacity: 0;
@@ -182,33 +180,62 @@
     height: 100%;
   }
 
-  .dropzone-icon {
-    font-size: 2rem;
-    margin-bottom: 0.75rem;
-    display: block;
-  }
-
-  .dropzone-text {
-    font-size: 0.95rem;
-    color: var(--muted);
-    margin-bottom: 0.25rem;
-  }
-
+  .dropzone-icon { font-size: 2rem; margin-bottom: 0.75rem; display: block; }
+  .dropzone-text { font-size: 0.95rem; color: var(--muted); margin-bottom: 0.25rem; }
   .dropzone-text strong { color: var(--blue); }
+  .dropzone-sub  { font-size: 0.78rem; color: var(--muted); opacity: 0.6; }
 
-  .dropzone-sub {
-    font-size: 0.78rem;
-    color: var(--muted);
-    opacity: 0.6;
+  /* ── File rows ── */
+  #fileList { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; }
+
+  .file-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.82rem;
   }
 
-  .file-selected {
+  .file-row-name {
     font-family: 'Space Mono', monospace;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: var(--pass);
-    margin-top: 0.5rem;
-    display: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
   }
+
+  .file-row select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.3rem 0.5rem;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.78rem;
+    outline: none;
+    transition: border-color 0.2s;
+    appearance: none;
+    min-width: 170px;
+  }
+  .file-row select:focus { border-color: var(--blue); }
+
+  .file-row-remove {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    padding: 0 0.25rem;
+    transition: color 0.15s;
+  }
+  .file-row-remove:hover { color: var(--fail); }
 
   /* ── Form fields ── */
   .field { margin-bottom: 1.25rem; }
@@ -237,9 +264,7 @@
     appearance: none;
   }
 
-  .field input:focus, .field select:focus {
-    border-color: var(--blue);
-  }
+  .field input:focus, .field select:focus { border-color: var(--blue); }
 
   /* ── Submit button ── */
   .btn-submit {
@@ -259,17 +284,9 @@
     overflow: hidden;
   }
 
-  .btn-submit:hover {
-    background: #6ab3ff;
-    transform: translateY(-1px);
-  }
-
+  .btn-submit:hover { background: #6ab3ff; transform: translateY(-1px); }
   .btn-submit:active { transform: translateY(0); }
-
-  .btn-submit.loading {
-    pointer-events: none;
-    opacity: 0.7;
-  }
+  .btn-submit.loading { pointer-events: none; opacity: 0.7; }
 
   /* ── Feature pills ── */
   .features {
@@ -291,12 +308,8 @@
     border-radius: 999px;
   }
 
-  .feature-dot {
-    width: 6px; height: 6px;
-    border-radius: 50%;
-  }
+  .feature-dot { width: 6px; height: 6px; border-radius: 50%; }
 
-  /* ── Footer ── */
   footer {
     position: relative;
     z-index: 1;
@@ -306,10 +319,8 @@
     color: var(--muted);
     border-top: 1px solid var(--border);
   }
-
   footer a { color: var(--blue); text-decoration: none; }
 
-  /* ── Loading overlay ── */
   .loading-overlay {
     display: none;
     position: fixed;
@@ -321,7 +332,6 @@
     justify-content: center;
     gap: 1.5rem;
   }
-
   .loading-overlay.active { display: flex; }
 
   .spinner {
@@ -331,18 +341,21 @@
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
   }
-
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  .loading-text {
-    font-family: 'Space Mono', monospace;
-    font-size: 0.85rem;
-    color: var(--blue);
-  }
+  .loading-text { font-family: 'Space Mono', monospace; font-size: 0.85rem; color: var(--blue); }
+  .loading-sub  { font-size: 0.78rem; color: var(--muted); }
 
-  .loading-sub {
-    font-size: 0.78rem;
-    color: var(--muted);
+  /* ── Error banner ── */
+  .error-banner {
+    display: none;
+    background: rgba(255,85,85,0.1);
+    border: 1px solid var(--fail);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.82rem;
+    color: var(--fail);
   }
 </style>
 </head>
@@ -350,7 +363,7 @@
 
 <div class="loading-overlay" id="loadingOverlay">
   <div class="spinner"></div>
-  <div class="loading-text">Running audit checks...</div>
+  <div class="loading-text" id="loadingText">Running audit checks...</div>
   <div class="loading-sub" id="loadingSub">Analysing configuration against vendor-specific security checks</div>
 </div>
 
@@ -369,55 +382,43 @@
 
   <h1>Audit your network<br><span>configuration</span> instantly</h1>
 
-  <p>Upload a device config file and get a professional security report in seconds. No Python. No terminal. No setup.</p>
+  <p>Upload one or more device config files and get a professional security report in seconds. No Python. No terminal. No setup.</p>
 
   <div class="card">
-    <form method="POST" action="/audit" enctype="multipart/form-data" id="auditForm">
+    <div class="error-banner" id="errorBanner"></div>
 
-      <div class="dropzone" id="dropzone">
-        <input type="file" name="config_file" id="fileInput" accept=".txt,.conf,.cfg,.log" required>
-        <span class="dropzone-icon">📄</span>
-        <div class="dropzone-text"><strong>Click to upload</strong> or drag and drop</div>
-        <div class="dropzone-sub">Supports .txt .conf .cfg — running-config output</div>
-        <div class="file-selected" id="fileSelected"></div>
-      </div>
+    <!-- Drop zone -->
+    <div class="dropzone-outer" id="dropzone">
+      <input type="file" id="fileInput" accept=".txt,.conf,.cfg,.log" multiple>
+      <span class="dropzone-icon">📄</span>
+      <div class="dropzone-text"><strong>Click to upload</strong> or drag and drop</div>
+      <div class="dropzone-sub">Supports .txt .conf .cfg — single or multiple files</div>
+    </div>
 
-      <div class="field">
-        <label>Device Type</label>
-        <select name="device_type" required>
-          {% for value, label in device_types %}
-          <option value="{{ value }}">{{ label }}</option>
-          {% endfor %}
-        </select>
-      </div>
+    <!-- Per-file rows (populated by JS) -->
+    <div id="fileList"></div>
 
-      <div class="field" id="deviceNameField">
-        <label>Device Name <span style="opacity:0.5">(optional)</span></label>
-        <input type="text" name="device_name" placeholder="e.g. Core-Router-01">
-      </div>
-
-      <div class="field">
-        <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;user-select:none">
-          <span>Custom Checks</span>
-          <span style="opacity:0.5;font-size:0.8rem">(optional — upload a .yaml rule file)</span>
-          <span id="customToggle" style="margin-left:auto;font-size:0.75rem;color:var(--accent);cursor:pointer" onclick="toggleCustomChecks()">+ Add</span>
-        </label>
-        <div id="customChecksSection" style="display:none;margin-top:0.5rem">
-          <div class="dropzone" id="yamlDropzone" style="padding:0.75rem 1rem;min-height:unset">
-            <input type="file" name="custom_checks_file" id="yamlInput" accept=".yaml,.yml">
-            <span class="dropzone-icon" style="font-size:1.2rem">📋</span>
-            <div class="dropzone-text" style="font-size:0.85rem"><strong>Click to upload</strong> your custom checks YAML</div>
-            <div class="dropzone-sub" style="font-size:0.75rem">See <code>custom_checks.example.yaml</code> in the repo for the schema</div>
-            <div class="file-selected" id="yamlSelected" style="font-size:0.8rem"></div>
-          </div>
+    <!-- Custom Checks YAML (optional) -->
+    <div class="field">
+      <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;user-select:none">
+        <span>Custom Checks</span>
+        <span style="opacity:0.5;font-size:0.8rem">(optional — upload a .yaml rule file)</span>
+        <span id="customToggle" style="margin-left:auto;font-size:0.75rem;color:var(--blue);cursor:pointer" onclick="toggleCustomChecks()">+ Add</span>
+      </label>
+      <div id="customChecksSection" style="display:none;margin-top:0.5rem">
+        <div class="dropzone-outer" id="yamlDropzone" style="padding:0.75rem 1rem">
+          <input type="file" id="yamlInput" accept=".yaml,.yml">
+          <span class="dropzone-icon" style="font-size:1.2rem">📋</span>
+          <div class="dropzone-text" style="font-size:0.85rem"><strong>Click to upload</strong> your custom checks YAML</div>
+          <div class="dropzone-sub" style="font-size:0.75rem">See <code>custom_checks.example.yaml</code> in the repo for the schema</div>
+          <div id="yamlSelected" style="display:none;font-family:'Space Mono',monospace;font-size:0.78rem;color:var(--pass);margin-top:0.4rem"></div>
         </div>
       </div>
+    </div>
 
-      <button type="submit" class="btn-submit" id="submitBtn">
-        Run Security Audit →
-      </button>
-
-    </form>
+    <button type="button" class="btn-submit" id="submitBtn" onclick="submitAudit()">
+      Run Security Audit →
+    </button>
   </div>
 
   <div class="features">
@@ -435,7 +436,7 @@
     </div>
     <div class="feature">
       <div class="feature-dot" style="background:#ff79c6"></div>
-      No data stored
+      Multi-device upload
     </div>
   </div>
 </main>
@@ -446,44 +447,77 @@
 </footer>
 
 <script>
-  const dropzone     = document.getElementById('dropzone');
-  const fileInput    = document.getElementById('fileInput');
-  const fileSelected = document.getElementById('fileSelected');
-  const form         = document.getElementById('auditForm');
-  const overlay      = document.getElementById('loadingOverlay');
-  const submitBtn    = document.getElementById('submitBtn');
+  const DEVICE_TYPES = [
+    {% for value, label in device_types %}
+    { value: "{{ value }}", label: "{{ label }}" },
+    {% endfor %}
+  ];
 
-  fileInput.addEventListener('change', () => {
-    if (fileInput.files.length > 0) {
-      fileSelected.style.display = 'block';
-      fileSelected.textContent   = '✓ ' + fileInput.files[0].name;
-      dropzone.style.borderColor = 'var(--pass-fg)';
+  // Selected files list (File objects)
+  let selectedFiles = [];
+
+  const dropzone    = document.getElementById('dropzone');
+  const fileInput   = document.getElementById('fileInput');
+  const fileList    = document.getElementById('fileList');
+  const overlay     = document.getElementById('loadingOverlay');
+  const submitBtn   = document.getElementById('submitBtn');
+  const errorBanner = document.getElementById('errorBanner');
+
+  // ── Build device type <select> HTML ──────────────────────────
+  function buildSelect(name, idx) {
+    const opts = DEVICE_TYPES.map(dt =>
+      `<option value="${dt.value}"${dt.value === 'cisco_ios' ? ' selected' : ''}>${dt.label}</option>`
+    ).join('');
+    return `<select id="dt_${idx}" title="Device type">${opts}</select>`;
+  }
+
+  // ── Render the per-file rows ──────────────────────────────────
+  function renderFileList() {
+    fileList.innerHTML = '';
+    selectedFiles.forEach((file, idx) => {
+      const row = document.createElement('div');
+      row.className = 'file-row';
+      row.innerHTML = `
+        <span class="file-row-name" title="${file.name}">✓ ${file.name}</span>
+        ${buildSelect('device_types', idx)}
+        <button class="file-row-remove" title="Remove" onclick="removeFile(${idx})">✕</button>
+      `;
+      fileList.appendChild(row);
+    });
+  }
+
+  function removeFile(idx) {
+    selectedFiles.splice(idx, 1);
+    renderFileList();
+  }
+
+  // ── Add files (de-duplicate by name) ─────────────────────────
+  function addFiles(newFiles) {
+    const existingNames = new Set(selectedFiles.map(f => f.name));
+    for (const f of newFiles) {
+      if (!existingNames.has(f.name)) {
+        selectedFiles.push(f);
+        existingNames.add(f.name);
+      }
     }
+    renderFileList();
+  }
+
+  // ── File input events ─────────────────────────────────────────
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files.length > 0) addFiles(Array.from(fileInput.files));
+    fileInput.value = ''; // reset so same file can be re-added after removal
   });
 
-  dropzone.addEventListener('dragover', e => {
-    e.preventDefault();
-    dropzone.classList.add('drag-over');
-  });
+  dropzone.addEventListener('dragover',  e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
   dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
   dropzone.addEventListener('drop', e => {
     e.preventDefault();
     dropzone.classList.remove('drag-over');
-    if (e.dataTransfer.files.length > 0) {
-      fileInput.files = e.dataTransfer.files;
-      fileSelected.style.display = 'block';
-      fileSelected.textContent   = '✓ ' + e.dataTransfer.files[0].name;
-      dropzone.style.borderColor = 'var(--pass-fg)';
-    }
+    if (e.dataTransfer.files.length > 0) addFiles(Array.from(e.dataTransfer.files));
   });
 
-  form.addEventListener('submit', () => {
-    overlay.classList.add('active');
-    submitBtn.classList.add('loading');
-    submitBtn.textContent = 'Analysing...';
-  });
-
-  // Custom checks YAML upload toggle + label
+  // ── Custom checks YAML toggle ─────────────────────────────────
   const yamlInput    = document.getElementById('yamlInput');
   const yamlSelected = document.getElementById('yamlSelected');
 
@@ -495,14 +529,77 @@
     toggle.textContent    = visible ? '+ Add' : '− Remove';
   }
 
-  if (yamlInput) {
-    yamlInput.addEventListener('change', () => {
-      if (yamlInput.files.length > 0) {
-        yamlSelected.style.display = 'block';
-        yamlSelected.textContent   = '✓ ' + yamlInput.files[0].name;
-        document.getElementById('yamlDropzone').style.borderColor = 'var(--accent)';
-      }
+  yamlInput.addEventListener('change', () => {
+    if (yamlInput.files.length > 0) {
+      yamlSelected.style.display = 'block';
+      yamlSelected.textContent   = '✓ ' + yamlInput.files[0].name;
+      document.getElementById('yamlDropzone').style.borderColor = 'var(--blue)';
+    }
+  });
+
+  // ── Show / hide error banner ──────────────────────────────────
+  function showError(msg) {
+    errorBanner.textContent = msg;
+    errorBanner.style.display = 'block';
+  }
+  function clearError() { errorBanner.style.display = 'none'; }
+
+  // ── Submit via fetch (supports multiple files) ────────────────
+  async function submitAudit() {
+    clearError();
+
+    if (selectedFiles.length === 0) {
+      showError('Please upload at least one config file.');
+      return;
+    }
+
+    const fd = new FormData();
+
+    // Attach each file with the field name 'config_files'
+    selectedFiles.forEach((file, idx) => {
+      fd.append('config_files', file);
     });
+
+    // Attach corresponding device types
+    selectedFiles.forEach((_, idx) => {
+      const sel = document.getElementById(`dt_${idx}`);
+      fd.append('device_types', sel ? sel.value : 'cisco_ios');
+    });
+
+    // Attach device names (empty strings are fine)
+    selectedFiles.forEach(() => fd.append('device_names', ''));
+
+    // Optional custom checks YAML
+    if (yamlInput.files.length > 0) {
+      fd.append('custom_checks_file', yamlInput.files[0]);
+    }
+
+    // Show overlay
+    const count = selectedFiles.length;
+    document.getElementById('loadingText').textContent =
+      count === 1 ? 'Running audit checks...' : `Auditing ${count} devices...`;
+    document.getElementById('loadingSub').textContent =
+      'Analysing configuration against vendor-specific security checks';
+    overlay.classList.add('active');
+    submitBtn.classList.add('loading');
+    submitBtn.textContent = 'Analysing...';
+
+    try {
+      const resp = await fetch('/audit', { method: 'POST', body: fd });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ detail: 'Unknown error' }));
+        throw new Error(err.detail || `Server error ${resp.status}`);
+      }
+      const html = await resp.text();
+      document.open();
+      document.write(html);
+      document.close();
+    } catch (err) {
+      overlay.classList.remove('active');
+      submitBtn.classList.remove('loading');
+      submitBtn.textContent = 'Run Security Audit →';
+      showError('Audit failed: ' + err.message);
+    }
   }
 </script>
 
